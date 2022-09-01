@@ -105,7 +105,6 @@ solve ::
 		:: seq_search([
 			int_search([x[i] | i in decreasing_area_order], input_order, indomain_min),
 			int_search([y[i] | i in decreasing_area_order], input_order, indomain_min),
-			bool_search(rotated, input_order, indomain_min, complete)
 		])
 	  :: restart_luby(100)
 minimize FINAL_H;
