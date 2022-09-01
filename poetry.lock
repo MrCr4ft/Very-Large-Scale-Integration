@@ -75,6 +75,17 @@ python-dateutil = ">=2.7"
 setuptools_scm = ">=4,<7"
 
 [[package]]
+name = "minizinc"
+version = "0.7.0"
+description = "Access MiniZinc directly from Python"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.extras]
+dzn = ["lark-parser (>=0.7.5)"]
+
+[[package]]
 name = "numpy"
 version = "1.23.2"
 description = "NumPy is the fundamental package for array computing with Python."
@@ -170,7 +181,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "ac8162285f41b1d3a4ba23685ed500e3c3322101f909b4816a67693b1c0ffaad"
+content-hash = "c86aafeca5efca381f75716aadfb4a411ab02c010f11e778b2cebffd9447d244"
 
 [metadata.files]
 click = [
@@ -295,6 +306,10 @@ matplotlib = [
     {file = "matplotlib-3.5.3-pp37-pypy37_pp73-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:57f1b4e69f438a99bb64d7f2c340db1b096b41ebaa515cf61ea72624279220ce"},
     {file = "matplotlib-3.5.3-pp37-pypy37_pp73-win_amd64.whl", hash = "sha256:d2484b350bf3d32cae43f85dcfc89b3ed7bd2bcd781ef351f93eb6fb2cc483f9"},
     {file = "matplotlib-3.5.3.tar.gz", hash = "sha256:339cac48b80ddbc8bfd05daae0a3a73414651a8596904c2a881cfd1edb65f26c"},
+]
+minizinc = [
+    {file = "minizinc-0.7.0-py3-none-any.whl", hash = "sha256:7380427e3c7980b859ab0b5950bd51b16b092492a59e7959392f889c578c0578"},
+    {file = "minizinc-0.7.0.tar.gz", hash = "sha256:e01ebbd423104a542dda8e6c6749d5c122d556edc1f85c14e0cc4bdd64df2430"},
 ]
 numpy = [
     {file = "numpy-1.23.2-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:e603ca1fb47b913942f3e660a15e55a9ebca906857edfea476ae5f0fe9b457d5"},
