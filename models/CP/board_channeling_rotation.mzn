@@ -88,9 +88,18 @@ constraint forall(i in CIRCUIT) (
     endif
 );
 
-% Symmetry breaking and domain reduction constraint: places the biggest rectangle in the lower half of the board
-constraint (x[decreasing_area_order[1]] <= (L - R_W[decreasing_area_order[1]]) div 2);
-constraint (y[decreasing_area_order[1]] <= (FINAL_H - R_H[decreasing_area_order[1]]) div 2);
+% Symmetry breaking constraint that imposes an ordering between the two biggest rectangle.
+% The biggest rectangle is placed on the bottom-left area of the board wrt the second biggest one.
+constraint
+  let {
+    int: o1 = decreasing_area_order[1],
+    int: o2 = decreasing_area_order[2]
+  }
+  in
+  lex_less(
+    [y[o1],x[o1]],
+    [y[o2],x[o2]]
+);
 
 % Symmetry is broken by imposing a lexicographic ordering on the flattened version of the board, with respect to its reflection upon axis and the diagonal
 constraint symmetry_breaking_constraint(
