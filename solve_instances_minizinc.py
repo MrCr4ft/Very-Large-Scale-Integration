@@ -44,23 +44,14 @@ def run(minizinc_model_filepath: str, minizinc_instances_input_dir: str, solutio
                 with open(os.path.join(solutions_output_dir, os.path.splitext(file)[0] + ".txt"), "w") as solution_file:
                     solution_file.write(solution)
 
-                if result.status == minizinc.Status.OPTIMAL_SOLUTION:
-                    solve_time_ms = result.statistics["solveTime"].total_seconds() * 1000
-                    csv_writer.writerow(
-                        {
-                            'instance': os.path.splitext(file)[0],
-                            'solved': True,
-                            'elapsed_ms': solve_time_ms
-                        }
-                    )
-                else:
-                    csv_writer.writerow(
-                        {
-                            'instance': os.path.splitext(file)[0],
-                            'solved': False,
-                            'elapsed_ms': timeout_ms
-                        }
-                    )
+                csv_writer.writerow(
+                    {
+                        'instance': os.path.splitext(file)[0],
+                        'solved': True,
+                        'elapsed_ms': result.statistics["solveTime"].total_seconds() * 1000
+                        if result.status == minizinc.Status.OPTIMAL_SOLUTION else timeout_ms
+                    }
+                )
 
     csv_stats_file.flush()
     csv_stats_file.close()
