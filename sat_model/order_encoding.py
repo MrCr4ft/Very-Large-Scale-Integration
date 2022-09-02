@@ -3,6 +3,7 @@ import itertools
 import math
 
 from z3 import *
+import numpy as np
 
 
 def linear_expression_order_encoding(a: typing.List[int], v_indexes: typing.List[int], c: int,
@@ -53,3 +54,18 @@ def axiom_clauses(v_indexes: typing.List[int], v_lower_bounds: typing.List[int],
             axiom_clauses_.append(Or(Not(v_order_encoding[v_index][c - 1]), v_order_encoding[v_index][c]))
 
     return axiom_clauses_
+
+
+def get_order_encoding_variables(v_name: str, v_number: int, v_lower_bounds: typing.List[int],
+                                 v_upper_bounds: typing.List[int]):
+    return [[Bool(f"p{v_name}_{i + 1}_{_e}") for _e in range(v_lower_bounds[i] - 1, v_upper_bounds[i] + 1)] for i in
+            range(v_number)]
+
+
+def retrieve_v_value(v_order_encoding: typing.List[typing.List[z3.BoolRef]], v_lower_bounds: typing.List[int],
+                     v_upper_bounds: typing.List[int],
+                     v_index: int, model: z3.ModelRef) -> int:
+    model_eval_v_order_encoding = [is_true(model[v_order_encoding[v_index][domain_value]]) for domain_value in
+                                   range(v_upper_bounds[v_index] - v_lower_bounds[v_index] + 2)]
+
+    return v_lower_bounds[v_index] - 1 + int(np.argmax(model_eval_v_order_encoding))
