@@ -11,12 +11,12 @@ CSV_FIELD_NAMES = ["instance", "solved", "elapsed_ms"]
 
 
 @click.command()
-@click.option('--path-to-instances', type=click.Path(exists=True), required=True)
-@click.option('--instances-input-dir', type=click.Path(exists=False), required=True)
+@click.option('--instances-input-dir', type=click.Path(exists=True), required=True)
+@click.option('--solutions-output-dir', type=click.Path(exists=False), required=True)
 @click.option('--stats-output-csv-file', type=click.Path(exists=False), required=True)
 @click.option('--timeout-ms', type=int, default=300000)
 def run(instances_input_dir: str, solutions_output_dir: str, stats_output_csv_file: str,
-        timeout: int = 300000):
+        timeout_ms: int = 300000):
 
     if not os.path.exists(solutions_output_dir):
         os.makedirs(solutions_output_dir)
@@ -30,7 +30,7 @@ def run(instances_input_dir: str, solutions_output_dir: str, stats_output_csv_fi
             current_instance_filepath = os.path.join(subdir, file)
             print("Solving instance " + os.path.splitext(file)[0] + " ...")
             solved_instance, elapsed_ms, is_exactly_solved = solve_2ssp_instance_json(current_instance_filepath,
-                                                                                      timeout)
+                                                                                      timeout_ms)
 
             with open(os.path.join(solutions_output_dir, os.path.splitext(file)[0] + ".txt"), "w") as solution_file:
                 json.dump(solved_instance, solution_file)
@@ -39,7 +39,7 @@ def run(instances_input_dir: str, solutions_output_dir: str, stats_output_csv_fi
                 {
                     'instance': os.path.splitext(file)[0],
                     'solved': is_exactly_solved,
-                    'elapsed_ms': elapsed_ms if is_exactly_solved else timeout
+                    'elapsed_ms': elapsed_ms if is_exactly_solved else timeout_ms
                 }
             )
 
