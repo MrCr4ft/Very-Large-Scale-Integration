@@ -1,4 +1,5 @@
 import typing
+import math
 
 import gurobipy as gp
 from gurobipy import GRB
@@ -6,7 +7,7 @@ from gurobipy import GRB
 
 def S1_MBM_Model(n_circuits: int, board_width: int, widths: typing.List[int],
                  heights: typing.List[int], height_lower_bound: int,
-                 height_upper_bound: int, timeout_s: float) -> gp.Model:
+                 height_upper_bound: int, timeout_s: float) -> typing.Tuple[gp.MVar, gp.MVar, gp.Model]:
     model = gp.Model("S1_MBM")
     model.setParam("TimeLimit", timeout_s)
 
@@ -77,8 +78,8 @@ def S1_MBM_Model(n_circuits: int, board_width: int, widths: typing.List[int],
         z_1[i, j] + z_1[j, i] + z_2[i, j] + z_2[j, i] == 1
         for i in range(n_circuits)
         for j in range(i + 1, n_circuits)
-    ), name="c6")
+    ), name="c7")
 
     model.params.MIPFocus = 1
 
-    return model
+    return x, y, model
