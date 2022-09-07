@@ -7,7 +7,7 @@ import click
 import gurobipy
 from gurobipy import GRB
 
-from mip.s1_mbm import S1_MBM_Model
+from milp.s1_bm import S1_BM_Model
 
 
 CSV_FIELD_NAMES = ["instance", "solved", "elapsed_ms"]
@@ -35,27 +35,21 @@ def run(instances_input_dir: str, solutions_output_dir: str, stats_output_csv_fi
                 current_instance = json.load(current_instance_file)
 
             print("Solving instance " + os.path.splitext(file)[0] + " ...")
-            x, y, model = S1_MBM_Model(n_circuits=current_instance['n_circuits'],
-                                       board_width=current_instance['board_width'],
-                                       widths=current_instance['heights'],
-                                       heights=current_instance['widths'],
-                                       height_lower_bound=current_instance['height_lower_bound'],
-                                       height_upper_bound=current_instance['height_upper_bound'],
-                                       timeout_s=timeout_ms / 1000
-                                       )
+            x, y, model = S1_BM_Model(**current_instance, timeout_s=timeout_ms / 1000)
             model.presolve()
             model.optimize()
 
             effective_x = [int(x[i].X) for i in range(current_instance['n_circuits'])]
-            effective_y = [int(y[i].X) - current_instance['heights'][i] for i in range(current_instance['n_circuits'])]
+            effective_y = [int(y[i].X) for i in range(current_instance['n_circuits'])]
 
-            solved_instance = copy.deepcopy(current_instance)
-            solved_instance['board_height'] = int(model.getVarByName("board_height").X)
-            solved_instance['circuit_x'] = effective_x
-            solved_instance['circuit_y'] = effective_y
+            if model.Status != GRB.LOADED:
+                solved_instance = copy.deepcopy(current_instance)
+                solved_instance['board_height'] = int(model.getVarByName("board_height").X)
+                solved_instance['circuit_x'] = effective_x
+                solved_instance['circuit_y'] = effective_y
 
-            with open(os.path.join(solutions_output_dir, os.path.splitext(file)[0] + ".txt"), "w") as solution_file:
-                json.dump(solved_instance, solution_file)
+                with open(os.path.join(solutions_output_dir, os.path.splitext(file)[0] + ".txt"), "w") as solution_file:
+                    json.dump(solved_instance, solution_file)
 
             csv_writer.writerow(
                 {
