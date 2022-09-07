@@ -4,7 +4,7 @@ import csv
 
 import click
 
-from sat_model.sat_model import solve_2ssp_instance_json
+from sat.sat_model import solve_2ssp_instance_json
 
 
 CSV_FIELD_NAMES = ["instance", "solved", "elapsed_ms"]
