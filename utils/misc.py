@@ -37,23 +37,23 @@ def get_cmap(n, name='hsv'):
     return plt.cm.get_cmap(name, n)
 
 
-def draw_board(board_length: int, board_height: int, n_circuit: int, circuit_width: typing.List[int],
-               circuit_height: typing.List[int], circuit_x: typing.List[int], circuit_y: typing.List[int],
+def draw_board(board_width: int, board_height: int, n_circuits: int, widths: typing.List[int],
+               heights: typing.List[int], x: typing.List[int], y: typing.List[int],
                output_file: str = None, color_map: str = None, shuffle_colors: bool = True):
     fig = plt.figure()
     ax = fig.add_subplot(111)
 
-    plt.xlim([0, board_length])
+    plt.xlim([0, board_width])
     plt.ylim([0, board_height])
 
-    cmap = get_cmap(n_circuit, color_map)
-    colors = [cmap(i) for i in range(n_circuit)]
+    cmap = get_cmap(n_circuits, color_map)
+    colors = [cmap(i) for i in range(n_circuits)]
     if shuffle_colors:
         random.shuffle(colors)
 
-    for i in range(n_circuit):
-        circuit = matplotlib.patches.Rectangle((circuit_x[i], circuit_y[i]),
-                                               circuit_width[i], circuit_height[i],
+    for i in range(n_circuits):
+        circuit = matplotlib.patches.Rectangle((x[i], y[i]),
+                                               widths[i], heights[i],
                                                color=colors[i])
         ax.add_patch(circuit)
 
