@@ -6,8 +6,9 @@ from gurobipy import GRB
 
 
 def SG_BM_Model(n_circuits: int, board_width: int, widths: typing.List[int],
-                 heights: typing.List[int], height_lower_bound: int,
-                 height_upper_bound: int, timeout_s: float) -> typing.Tuple[gp.MVar, gp.MVar, gp.Model]:
+                heights: typing.List[int], height_lower_bound: int,
+                height_upper_bound: int, activate_symmetry_breaking: bool, timeout_s: float) \
+        -> typing.Tuple[gp.MVar, gp.MVar, gp.Model]:
     model = gp.Model("SG_BM")
     model.setParam("TimeLimit", timeout_s)
 
@@ -57,6 +58,21 @@ def SG_BM_Model(n_circuits: int, board_width: int, widths: typing.List[int],
         for i in range(n_circuits)
         for j in range(i + 1, n_circuits)
     ), name="c5")
+
+    if activate_symmetry_breaking:
+        areas = [widths[i] * heights[i] for i in range(n_circuits)]
+        sorted_indexes = [i for _, i in sorted(zip(areas, range(n_circuits)), reverse=True)]
+
+        biggest_rectangle_x_bound = (board_width - widths[sorted_indexes[0]]) // 2
+        biggest_rectangle_y_bound = (height_upper_bound - heights[sorted_indexes[0]]) // 2
+
+        model.addConstr(x[sorted_indexes[0]] <= biggest_rectangle_x_bound, name="dom_red_x")
+        model.addConstrs(((z_1[i, sorted_indexes[0]] == 0) for i in range(n_circuits) if widths[i] >
+                         biggest_rectangle_x_bound), name="dom_red_x_impl")
+
+        model.addConstr(y[sorted_indexes[0]] <= biggest_rectangle_y_bound, name="dom_red_y")
+        model.addConstrs(((z_2[sorted_indexes[0], i] == 0) for i in range(n_circuits) if heights[i] >
+                         biggest_rectangle_y_bound), name="dom_red_y_impl")
 
     model.params.MIPFocus = 1
 
