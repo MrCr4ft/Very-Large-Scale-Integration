@@ -9,12 +9,11 @@ import gurobipy
 from gurobipy import GRB
 
 from milp.S1 import S1_BM_Model, S1_MBM_Model
-from milp.S2 import S2_BM_Model
 from milp.SG import SG_BM_Model
 
 
 CSV_FIELD_NAMES = ["instance", "solved", "elapsed_ms"]
-MODELS = {"S1_BM": S1_BM_Model, "S1_MBM": S1_MBM_Model, "S2_BM": S2_BM_Model, "SG_BM": SG_BM_Model}
+MODELS = {"S1_BM": S1_BM_Model, "S1_MBM": S1_MBM_Model, "SG_BM": SG_BM_Model}
 
 
 @click.command()
@@ -25,7 +24,7 @@ MODELS = {"S1_BM": S1_BM_Model, "S1_MBM": S1_MBM_Model, "S2_BM": S2_BM_Model, "S
 @click.option('--model-name', type=str, required=False, default="S2_BM")
 @click.option('--activate-symmetry-breaking', type=bool, required=False, default=False)
 def run(instances_input_dir: str, solutions_output_dir: str, stats_output_csv_file: str,
-        timeout_ms: int = 300000, model_name: str = "S2_BM", activate_symmetry_breaking: bool = False):
+        timeout_ms: int = 300000, model_name: str = "S1_BM", activate_symmetry_breaking: bool = False):
 
     assert model_name in MODELS, "Unknown model!"
 
