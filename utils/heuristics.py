@@ -78,11 +78,21 @@ def bfdh_upper_bound(widths: np.ndarray, heights: np.ndarray, board_width: int):
 
 
 def kp01_upper_bound(widths: np.ndarray, heights: np.ndarray, board_width: int):
+    unpacked_rectangles = list(heights.argsort()[::-1])
+    solution = {
+        'n_circuits': widths.size,
+        'widths': widths,
+        'heights': heights,
+        'board_width': board_width
+    }
+    x = np.zeros(shape=(widths.size,), dtype=np.int)
+    y = np.zeros(shape=(widths.size,), dtype=np.int)
     h_level = 0
     unpacked_rectangles = list(heights.argsort()[::-1])
     while len(unpacked_rectangles) > 0:
         j_star = unpacked_rectangles[0]
-        h_level += + heights[j_star]
+        x[j_star] = 0
+        y[j_star] = h_level
         unpacked_rectangles.remove(j_star)
         # solve kp01 instance
         # maximize sum of h[i]*w[i]*chosen[i] for i in unpacked_rectangles
@@ -92,10 +102,20 @@ def kp01_upper_bound(widths: np.ndarray, heights: np.ndarray, board_width: int):
                                                  areas, len(unpacked_rectangles))
 
         to_be_removed = [unpacked_rectangles[i] for i in items_chosen]
+        current_x = widths[j_star]
         for item_to_remove in to_be_removed:
+            x[item_to_remove] = current_x
+            y[item_to_remove] = h_level
+            current_x += widths[item_to_remove]
             unpacked_rectangles.remove(item_to_remove)
 
-    return h_level
+        h_level += + heights[j_star]
+
+    solution['board_height'] = h_level
+    solution['x'] = x
+    solution['y'] = y
+
+    return solution
 
 
 def knapsack_01(max_weight, weights, values, n_items):
