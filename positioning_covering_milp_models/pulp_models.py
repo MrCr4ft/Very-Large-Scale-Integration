@@ -46,7 +46,8 @@ class PCMILPProblem(ABC):
         self.height_lower_bound = height_lower_bound
         self.height_upper_bound = height_upper_bound
         self.time_limit = 300
-        self.solver = "GUROBI"
+        self.set_solver("GUROBI_CMD")
+        print("Solver set to GUROBI CMD by default. Change solver if needed.")
         self.__compute_circuits_demands()
 
     def __compute_circuits_demands(self):
@@ -239,7 +240,11 @@ class PCMILPProblemNoRotation(PCMILPProblem):
             # Solve the model
             print("Trying to solve the model with board height equal to %d..." % lb)
             print("The time limit is %d seconds" % self.time_limit)
+            start_time = perf_counter()
             model.solve(self.solver)
+            end_time = perf_counter()
+
+            time_limit_exceeded = np.ceil(end_time - start_time) >= self.time_limit
 
             print("Accessing to the status of the model...")
             print("The status of the model is %s" % pl.LpStatus[model.status])
@@ -247,9 +252,15 @@ class PCMILPProblemNoRotation(PCMILPProblem):
             if model.status == 1:
                 print("Model solved")
                 lb = ub + 1
+            elif time_limit_exceeded:
+                print("Time limit exceeded")
+                ub = lb - 1
             else:
                 print("Unsatisfiable with height equal to %d" % lb)
                 lb += 1
+
+        if time_limit_exceeded:
+            return None
 
         # Get the solution
         n_circuits, widths, heights, xs, ys = self._retrieve_solution(x, valid_positions, correspondence_matrix)
@@ -376,16 +387,10 @@ class PCMILPProblemRotation(PCMILPProblem):
                 if x[(i, j)].roundedValue() == 1:
                     assigned_positions.append(j)
                     rotated.append(False)
-                elif x[(i, j)].varValue != 0:
-                    print("x[{i}, {j}] = {var}".format(i=i, j=j, var=x[(i, j)].varValue))
-                    print("round(x[{i}, {j}]) = {var}".format(i=i, j=j, var=x[(i, j)].round()))
             for j in valid_positions_rotated[i]:
                 if y[(i, j)].roundedValue() == 1:
                     assigned_positions.append(j)
                     rotated.append(True)
-                elif y[(i, j)].varValue != 0:
-                    print("y[{i}, {j}] = {var}".format(i=i, j=j, var=y[(i, j)].varValue))
-                    print("round(y[{i}, {j}]) = {var}".format(i=i, j=j, var=y[(i, j)].round()))
 
         xs = []
         ys = []
@@ -439,7 +444,11 @@ class PCMILPProblemRotation(PCMILPProblem):
             # Solve the model
             print("Trying to solve the model with board height equal to %d..." % lb)
             print("The time limit is %d seconds" % self.time_limit)
+            start_time = perf_counter()
             model.solve(self.solver)
+            end_time = perf_counter()
+
+            time_limit_exceeded = np.ceil(end_time - start_time) >= self.time_limit
 
             print("Accessing to the status of the model...")
             print("The status of the model is %s" % pl.LpStatus[model.status])
@@ -447,9 +456,15 @@ class PCMILPProblemRotation(PCMILPProblem):
             if model.status == 1:
                 print("Model solved")
                 lb = ub + 1
+            elif time_limit_exceeded:
+                print("Time limit exceeded")
+                ub = lb - 1
             else:
                 print("Unsatisfiable with height equal to %d" % lb)
                 lb += 1
+
+        if time_limit_exceeded:
+            return None
 
         # Get the solution
         n_circuits, widths, heights, xs, ys = self._retrieve_solution(x, y, valid_positions, valid_positions_rotated,
