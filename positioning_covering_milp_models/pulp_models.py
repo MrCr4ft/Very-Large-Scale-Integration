@@ -4,15 +4,36 @@ from collections import Counter
 from abc import ABC, abstractmethod
 
 import pulp as pl
+from numpy import ndarray
 from pulp import *
 import numpy as np
 
 SOLVERS = {
-    "GUROBI": lambda time_limit: pl.GUROBI_CMD(msg=True, timeLimit=time_limit),
-    "CPLEX": lambda time_limit: pl.CPLEX_CMD(msg=True, timeLimit=time_limit),
+    "GUROBI_CMD": lambda time_limit: pl.GUROBI_CMD(msg=True, timeLimit=time_limit, options=[("MIPFocus", 1)]),
+    "GUROBI_PY": lambda time_limit: pl.GUROBI(msg=True, timeLimit=time_limit),
+    "CPLEX_CMD": lambda time_limit: pl.CPLEX_CMD(msg=True, timeLimit=time_limit,
+                                             options=["set mip tolerances integrality 1e-05", "set emphasis mip 1"]),
     "GLPK": lambda time_limit: pl.GLPK_CMD(msg=True, timeLimit=time_limit),
-    "PULP_CBC": lambda time_limit: pl.PULP_CBC_CMD(msg=True, timeLimit=time_limit)
+    "PULP_CBC": lambda time_limit: pl.PULP_CBC_CMD(msg=True, timeLimit=time_limit),
+    "CPLEX_PY": lambda time_limit: pl.CPLEX_PY(msg=True, timeLimit=time_limit),
 }
+
+
+def valid_positions_for_circuit(board_width: int, board_height: int, circuit_width: int, circuit_height: int) \
+        -> list[list[int]]:
+    covered_points_for_position = []
+    horizontal_valid_range = range(0, board_width - circuit_width + 1, 1)
+    vertical_valid_range = range(0, board_height - circuit_height + 1, 1)
+    for i in horizontal_valid_range:
+        for j in vertical_valid_range:
+            covered_points = []
+            for k in range(circuit_height):
+                start = (j + k) * board_width + i
+                end = start + circuit_width
+                covered_points += list(range(start, end))
+            covered_points_for_position.append(covered_points)
+
+    return covered_points_for_position
 
 
 class PCMILPProblem(ABC):
@@ -55,8 +76,10 @@ class PCMILPProblem(ABC):
     def _set_board_height(self, board_height: int) -> None:
         self.board_height = board_height
 
-    def _positioning_and_covering_step(self, rotated: bool = False) \
-            -> typing.Tuple[typing.List[typing.List[int]], np.ndarray, typing.List[int]]:
+    @abstractmethod
+    def _positioning_and_covering_step(self, *args, **kwargs) \
+            -> typing.Tuple[typing.List[typing.List[int]], typing.Optional[typing.List[typing.List[int]]],
+                            np.ndarray, typing.List[int]]:
         """
         Generates the set of valid positions, and the correspondence matrix,
         where items can be placed into the strip.
@@ -72,44 +95,7 @@ class PCMILPProblem(ABC):
         demands: list[int]: The number of occurrences of each unique item (by shape)
         upper_bounds: list[int]: The number of times each unique item can be placed inside the strip
         """
-
-        j_h_cm: typing.List[typing.List[int]] = list()
-        valid_positions: typing.List[typing.List[int]] = list()
-        upper_bounds: typing.List[int] = list()
-
-        if rotated:
-            widths = self.heights
-            heights = self.widths
-        else:
-            widths = self.widths
-            heights = self.heights
-
-        current_pos = 0
-        for circuit_idx in range(self.n_unique_circuits):
-            horizontal_valid_range = range(0, self.board_width - widths[circuit_idx] + 1, 1)
-            vertical_valid_range = range(0, self.board_height - heights[circuit_idx] + 1, 1)
-            covered_idxs = []
-            first_valid_pos = current_pos
-
-            for vertical_idx in vertical_valid_range:
-                for horizontal_idx in horizontal_valid_range:
-                    sub_list = []
-                    for covered_row_idx in range(heights[circuit_idx]):
-                        start = (vertical_idx + covered_row_idx) * self.board_width + horizontal_idx
-                        end = start + widths[circuit_idx]
-                        sub_list += list(range(start, end))
-                    covered_idxs.append(sub_list)
-                    current_pos += 1
-
-            j_h_cm += covered_idxs
-            valid_positions.append(list(range(first_valid_pos, current_pos)))
-            upper_bounds.append(len(valid_positions[-1]))
-
-        correspondence_matrix = np.zeros((len(j_h_cm), self.board_width * self.board_height), dtype=int)
-        for idx, valid_pos in enumerate(j_h_cm):
-            correspondence_matrix[idx, valid_pos] = 1
-
-        return valid_positions, correspondence_matrix, upper_bounds
+        pass
 
     @abstractmethod
     def _build_model(self, *args, **kwargs) -> typing.Tuple[pl.LpProblem, typing.Dict[typing.Tuple, pl.LpVariable],
@@ -142,16 +128,52 @@ class PCMILPProblemNoRotation(PCMILPProblem):
     def from_dict(instance_dict: dict) -> "PCMILPProblemNoRotation":
         return PCMILPProblemNoRotation(**instance_dict)
 
+    def _positioning_and_covering_step(self) \
+            -> typing.Tuple[typing.List[typing.List[int]], np.ndarray, typing.List[int]]:
+        """
+        Generates the set of valid positions, and the correspondence matrix,
+        where items can be placed into the strip.
+        widths: list[int]: The widths of the circuits.
+        heights: list[int]: The heights of the circuits.
+        board_width: int: The width of the board.
+        board_height: int: The current height of the board.
+        rotated: bool: Whether to rotate the circuits or not.
+        :return:
+        valid_positions: list[list[int]]: The set of valid positions grouped by item
+        correspondence_matrix: np.ndarray: The correspondence matrix
+        demands: list[int]: The number of occurrences of each unique item (by shape)
+        upper_bounds: list[int]: The number of times each unique item can be placed inside the strip
+        """
+        j_h_cm: typing.List[typing.List[int]] = list()
+        unique_labels: typing.List[typing.List[int]] = list()
+        upper_bounds: typing.List[int] = list()
+
+        unique_labels_counter = 0
+        for circuit_idx in range(self.n_unique_circuits):
+            valid_positions_ = valid_positions_for_circuit(self.board_width, self.board_height,
+                                                           self.widths[circuit_idx], self.heights[circuit_idx])
+            unique_labels.append(list(range(unique_labels_counter, unique_labels_counter + len(valid_positions_))))
+            unique_labels_counter += len(valid_positions_)
+            upper_bounds.append(len(valid_positions_))
+            j_h_cm += valid_positions_
+
+        correspondence_matrix = np.zeros((len(j_h_cm), self.board_width * self.board_height), dtype=int)
+        for idx, valid_pos in enumerate(j_h_cm):
+            correspondence_matrix[idx, valid_pos] = 1
+
+        return unique_labels, correspondence_matrix, upper_bounds
+
     def _build_model(self, valid_positions: typing.List[typing.List[int]], correspondence_matrix: np.ndarray,
                      upper_bounds: typing.List[int]) \
             -> typing.Tuple[pl.LpProblem, typing.Dict[typing.Tuple, pl.LpVariable]]:
         model = pl.LpProblem("position_and_covering_milp_model")
         x = LpVariable.dicts("x", [(i, j) for i in range(self.n_unique_circuits) for j in valid_positions[i]], 0, 1,
-                             LpBinary)
+                             LpInteger)
 
         for p in range(correspondence_matrix.shape[1]):
-            model += lpSum(x[(i, j)] * correspondence_matrix[j, p] for i in range(self.n_unique_circuits)
-                           for j in valid_positions[i]) <= 1
+            variables_to_sum = [x[i, j] for i in range(self.n_unique_circuits) for j in valid_positions[i] if
+                                correspondence_matrix[j, p] == 1]
+            model += lpSum(variables_to_sum) <= 1
 
         for i in range(self.n_unique_circuits):
             model += lpSum(x[(i, j)] for j in valid_positions[i]) >= self.demands[i]
@@ -159,10 +181,9 @@ class PCMILPProblemNoRotation(PCMILPProblem):
         for i in range(self.n_unique_circuits):
             model += lpSum(x[(i, j)] for j in valid_positions[i]) <= upper_bounds[i]
 
-        model += lpSum(x[(i, j)] * correspondence_matrix[j, p]
-                       for i in range(self.n_unique_circuits)
-                       for j in valid_positions[i]
-                       for p in range(correspondence_matrix.shape[1])) <= self.board_width * self.board_height
+        variables_to_sum = [x[i, j] for i in range(self.n_unique_circuits) for j in valid_positions[i]
+                            for p in range(correspondence_matrix.shape[1]) if correspondence_matrix[j, p] == 1]
+        model += lpSum(variables_to_sum) <= self.board_width * self.board_height
 
         return model, x
 
@@ -172,7 +193,7 @@ class PCMILPProblemNoRotation(PCMILPProblem):
         assigned_positions = []
         for i in range(self.n_unique_circuits):
             for j in valid_positions[i]:
-                if x[(i, j)].value() == 1:
+                if x[(i, j)].roundedValue() == 1:
                     assigned_positions.append(j)
 
         xs = []
@@ -260,22 +281,73 @@ class PCMILPProblemRotation(PCMILPProblem):
     def from_dict(instance_dict: dict) -> "PCMILPProblemRotation":
         return PCMILPProblemRotation(**instance_dict)
 
+    def _positioning_and_covering_step(self) \
+            -> tuple[list[list[int]], list[list[int]], ndarray, list[int]]:
+        """
+        Generates the set of valid positions, and the correspondence matrix,
+        where items can be placed into the strip when rotation is allowed.
+        widths: list[int]: The widths of the circuits.
+        heights: list[int]: The heights of the circuits.
+        board_width: int: The width of the board.
+        board_height: int: The current height of the board.
+        rotated: bool: Whether to rotate the circuits or not.
+        :return:
+        valid_positions: list[list[int]]: The set of valid positions grouped by item
+        valid_positions_rotated: list[list[int]]: The set of valid positions grouped by item when rotated
+        correspondence_matrix: np.ndarray: The correspondence matrix
+        demands: list[int]: The number of occurrences of each unique item (by shape)
+        upper_bounds: list[int]: The number of times each unique item can be placed inside the strip
+        """
+        j_h_cm: typing.List[typing.List[int]] = list()
+        unique_labels: typing.List[typing.List[int]] = list()
+        upper_bounds: typing.List[int] = list()
+
+        unique_labels_counter = 0
+        for circuit_idx in range(self.n_unique_circuits):
+            valid_positions_ = valid_positions_for_circuit(self.board_width, self.board_height,
+                                                           self.widths[circuit_idx], self.heights[circuit_idx])
+            unique_labels.append(list(range(unique_labels_counter, unique_labels_counter + len(valid_positions_))))
+            unique_labels_counter += len(valid_positions_)
+            upper_bounds.append(len(valid_positions_))
+            j_h_cm += valid_positions_
+
+        last_label_index_not_rotated = len(unique_labels)
+        for circuit_idx in range(self.n_unique_circuits):
+            if self.widths[circuit_idx] == self.heights[circuit_idx]:
+                unique_labels.append([])
+                continue
+            valid_positions_ = valid_positions_for_circuit(self.board_width, self.board_height,
+                                                           self.heights[circuit_idx], self.widths[circuit_idx])
+            unique_labels.append(list(range(unique_labels_counter, unique_labels_counter + len(valid_positions_))))
+            unique_labels_counter += len(valid_positions_)
+            upper_bounds.append(len(valid_positions_))
+            j_h_cm += valid_positions_
+
+        correspondence_matrix = np.zeros((len(j_h_cm), self.board_width * self.board_height), dtype=int)
+        for idx, valid_pos in enumerate(j_h_cm):
+            correspondence_matrix[idx, valid_pos] = 1
+
+        return unique_labels[:last_label_index_not_rotated], \
+               unique_labels[last_label_index_not_rotated:], correspondence_matrix, upper_bounds
+
     def _build_model(self, valid_positions: typing.List[typing.List[int]], correspondence_matrix: np.ndarray,
-                     upper_bounds: typing.List[int], valid_positions_rotated: typing.List[typing.List[int]],
-                     correspondence_matrix_rotated: np.ndarray, upper_bounds_rotated: typing.List[int]) \
+                     upper_bounds: typing.List[int], valid_positions_rotated: typing.List[typing.List[int]]) \
             -> typing.Tuple[pl.LpProblem, typing.Dict[typing.Tuple, pl.LpVariable],
                             typing.Dict[typing.Tuple, pl.LpVariable]]:
-        model = pl.LpProblem("position_and_covering_milp_model_rotation_allowed")
-        x = LpVariable.dicts("x", [(i, j) for i in range(self.n_unique_circuits) for j in valid_positions[i]], 0, 1,
-                             LpBinary)
+        model = pl.LpProblem("position_and_covering_milp_model_rotation_allowed", pl.LpMinimize)
+        model += 0, "objective_function"
+
+        x = LpVariable.dicts("x", [(i, j) for i in range(self.n_unique_circuits) for j in valid_positions[i]],
+                             0, 1, LpInteger)
         y = LpVariable.dicts("y", [(i, j) for i in range(self.n_unique_circuits) for j in valid_positions_rotated[i]],
-                             0, 1, LpBinary)
+                             0, 1, LpInteger)
 
         for p in range(correspondence_matrix.shape[1]):
-            model += lpSum(x[(i, j)] * correspondence_matrix[j, p] for i in range(self.n_unique_circuits)
-                           for j in valid_positions[i]) + \
-                     lpSum(y[(i, j)] * correspondence_matrix_rotated[j, p] for i in range(self.n_unique_circuits)
-                           for j in valid_positions_rotated[i]) <= 1
+            variables_to_sum_x = [x[i, j] for i in range(self.n_unique_circuits) for j in valid_positions[i] if
+                                  correspondence_matrix[j, p] == 1]
+            variables_to_sum_y = [y[i, j] for i in range(self.n_unique_circuits) for j in valid_positions_rotated[i] if
+                                  correspondence_matrix[j, p] == 1]
+            model += lpSum(variables_to_sum_x) + lpSum(variables_to_sum_y) <= 1
 
         for i in range(self.n_unique_circuits):
             model += lpSum(x[(i, j)] for j in valid_positions[i]) + \
@@ -285,36 +357,35 @@ class PCMILPProblemRotation(PCMILPProblem):
             model += lpSum(x[(i, j)] for j in valid_positions[i]) + \
                      lpSum(y[(i, j)] for j in valid_positions_rotated[i]) <= upper_bounds[i]
 
-        model += lpSum(x[(i, j)] * correspondence_matrix[j, p]
-                       for i in range(self.n_unique_circuits)
-                       for j in valid_positions[i]
-                       for p in range(correspondence_matrix.shape[1])) + \
-                 lpSum(y[(i, j)] * correspondence_matrix_rotated[j, p]
-                       for i in range(self.n_unique_circuits)
-                       for j in valid_positions_rotated[i]
-                       for p in range(correspondence_matrix_rotated.shape[1])) <= self.board_width * self.board_height
+        variables_to_sum_x = [x[(i, j)] for i in range(self.n_unique_circuits) for j in valid_positions[i]
+                              for p in range(correspondence_matrix.shape[1]) if correspondence_matrix[j, p] == 1]
+        variables_to_sum_y = [y[(i, j)] for i in range(self.n_unique_circuits) for j in valid_positions_rotated[i]
+                              for p in range(correspondence_matrix.shape[1]) if correspondence_matrix[j, p] == 1]
+        model += lpSum(variables_to_sum_x) + lpSum(variables_to_sum_y) <= self.board_width * self.board_height
 
         return model, x, y
 
     def _retrieve_solution(self, x: typing.Dict[typing.Tuple, LpVariable], y: typing.Dict[typing.Tuple, LpVariable],
-                           valid_positions: [typing.List[typing.List[int]]], correspondence_matrix: np.ndarray,
-                           valid_positions_rotated: typing.List[typing.List[int]],
-                           correspondence_matrix_rotated: np.ndarray) \
+                           valid_positions: [typing.List[typing.List[int]]],
+                           valid_positions_rotated: typing.List[typing.List[int]], correspondence_matrix: np.ndarray) \
             -> tuple[int, list[int], list[int], list[int], list[int]]:
         assigned_positions = []
         rotated = []
         for i in range(self.n_unique_circuits):
             for j in valid_positions[i]:
-                if x[(i, j)].value() == 1:
+                if x[(i, j)].roundedValue() == 1:
                     assigned_positions.append(j)
                     rotated.append(False)
+                elif x[(i, j)].varValue != 0:
+                    print("x[{i}, {j}] = {var}".format(i=i, j=j, var=x[(i, j)].varValue))
+                    print("round(x[{i}, {j}]) = {var}".format(i=i, j=j, var=x[(i, j)].round()))
             for j in valid_positions_rotated[i]:
-                if y[(i, j)].value() == 1:
+                if y[(i, j)].roundedValue() == 1:
                     assigned_positions.append(j)
                     rotated.append(True)
-
-        assert len(assigned_positions) == self.n_unique_circuits, \
-            "The number of assigned positions is not equal to the number of unique circuits"
+                elif y[(i, j)].varValue != 0:
+                    print("y[{i}, {j}] = {var}".format(i=i, j=j, var=y[(i, j)].varValue))
+                    print("round(y[{i}, {j}]) = {var}".format(i=i, j=j, var=y[(i, j)].round()))
 
         xs = []
         ys = []
@@ -325,8 +396,7 @@ class PCMILPProblemRotation(PCMILPProblem):
                 circuits_indexes.append(i)
 
         for idx, position in enumerate(assigned_positions):
-            index = np.argmax(correspondence_matrix_rotated[position, :]) if rotated else np.argmax(
-                correspondence_matrix[position, :])
+            index = np.argmax(correspondence_matrix[position, :])
             y_ = index // self.board_width
             x_ = index - (y_ * self.board_width)
             xs.append(x_)
@@ -353,17 +423,15 @@ class PCMILPProblemRotation(PCMILPProblem):
         # Linear search for the optimal height
         while lb <= ub:
             self._set_board_height(lb)
-            valid_positions, correspondence_matrix, upper_bounds = self._positioning_and_covering_step()
-            valid_positions_rotated, correspondence_matrix_rotated, upper_bounds_rotated = \
-                self._positioning_and_covering_step(rotated=True)
+            valid_positions, valid_positions_rotated, correspondence_matrix, upper_bounds = \
+                self._positioning_and_covering_step()
 
             # Create the model
             start_time = perf_counter()
 
             print("Building model using Pulp...")
             model, x, y = self._build_model(valid_positions, correspondence_matrix, upper_bounds,
-                                            valid_positions_rotated,
-                                            correspondence_matrix_rotated, upper_bounds_rotated)
+                                            valid_positions_rotated)
 
             end_time = perf_counter()
             print("It took %.2f seconds to build the model" % (end_time - start_time))
@@ -384,9 +452,8 @@ class PCMILPProblemRotation(PCMILPProblem):
                 lb += 1
 
         # Get the solution
-        n_circuits, widths, heights, xs, ys = self._retrieve_solution(x, y, valid_positions, correspondence_matrix,
-                                                                      valid_positions_rotated,
-                                                                      correspondence_matrix_rotated)
+        n_circuits, widths, heights, xs, ys = self._retrieve_solution(x, y, valid_positions, valid_positions_rotated,
+                                                                      correspondence_matrix)
 
         return {
             'board_width': self.board_width,
