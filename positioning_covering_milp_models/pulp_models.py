@@ -464,16 +464,3 @@ class PCMILPProblemRotation(PCMILPProblem):
             'x': xs,
             'y': ys
         }
-
-
-def dict_to_dzn(board_width: int, board_height: int, n_circuits: int, widths: typing.List[int],
-                heights: typing.List[int], x: typing.List[int], y: typing.List[int]):
-    dzn = "board_width = %d;\n" % board_width
-    dzn += "board_height = %d;\n" % board_height
-    dzn += "n_circuits = %d;\n" % n_circuits
-    dzn += "widths = [%s];\n" % ", ".join([str(w) for w in widths])
-    dzn += "heights = [%s];\n" % ", ".join([str(h) for h in heights])
-    dzn += "x = [%s];\n" % ", ".join([str(x_) for x_ in x])
-    dzn += "y = [%s];\n" % ", ".join([str(y_) for y_ in y])
-
-    return dzn
