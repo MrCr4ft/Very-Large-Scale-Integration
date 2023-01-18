@@ -66,9 +66,9 @@ class SPulpModel(ABC):
                                           cat=LpInteger)
 
         # Define circuit positioning variables
-        self.x = [pl.LpVariable("x_%d" % i, lowBound=0, upBound=self.height_upper_bound - self.widths[i], cat=LpInteger)
+        self.x = [pl.LpVariable("x_%d" % i, lowBound=0, upBound=self.board_width - self.widths[i], cat=LpInteger)
                   for i in range(self.n_circuits)]
-        self.y = [pl.LpVariable("y_%d" % i, lowBound=self.heights[i], upBound=self.board_width, cat=LpInteger)
+        self.y = [pl.LpVariable("y_%d" % i, lowBound=0, upBound=self.height_upper_bound - self.heights[i], cat=LpInteger)
                   for i in range(self.n_circuits)]
 
         # Define auxiliary variables
@@ -82,8 +82,8 @@ class SPulpModel(ABC):
     def _warm_start_solver(self):
         initial_solution = kp01_upper_bound(np.array(self.widths), np.array(self.heights), self.board_width)
         for i in range(self.n_circuits):
-            self.x[i].setInitialValue(initial_solution["y"][i])
-            self.y[i].setInitialValue(initial_solution["x"][i] + self.heights[i])
+            self.x[i].setInitialValue(initial_solution["x"][i])
+            self.y[i].setInitialValue(initial_solution["y"][i])
 
         self.board_height.setInitialValue(initial_solution["board_height"])
         for i in range(self.n_circuits):
@@ -122,8 +122,8 @@ class SPulpModel(ABC):
         areas = [self.widths[i] * self.heights[i] for i in range(self.n_circuits)]
         sorted_indexes = [i for _, i in sorted(zip(areas, range(self.n_circuits)), reverse=True)]
 
-        biggest_circuit_x_upper_bound = (self.height_upper_bound - self.widths[sorted_indexes[0]]) // 2
-        biggest_circuit_y_upper_bound = (self.board_width + self.heights[sorted_indexes[0]]) // 2
+        biggest_circuit_x_upper_bound = (self.board_height - self.widths[sorted_indexes[0]]) // 2
+        biggest_circuit_y_upper_bound = (self.height_upper_bound + self.heights[sorted_indexes[0]]) // 2
 
         self.model += self.x[sorted_indexes[0]] <= biggest_circuit_x_upper_bound
         self.model += self.y[sorted_indexes[0]] <= biggest_circuit_y_upper_bound
@@ -154,9 +154,17 @@ class SPulpModel(ABC):
         ys = []
         for i in range(self.n_circuits):
             xs.append(self.x[i].roundedValue())
-            ys.append(self.y[i].roundedValue() - self.heights[i])
+            ys.append(self.y[i].roundedValue())
 
-        return self.n_circuits, self.widths, self.heights, xs, ys, self.board_height.roundedValue()
+        return {
+            'board_width': self.board_width,
+            'board_height': self.board_height.varValue,
+            'n_circuits': self.n_circuits,
+            'widths': self.widths,
+            'heights': self.heights,
+            'x': xs,
+            'y': ys
+        }
 
     def solve(self):
         start_time = perf_counter()
@@ -215,23 +223,23 @@ class SGBMPulpModel(SPulpModel):
     def _add_model_specific_constraints(self):
         # Enforce board height to be the maximum y coordinate of any circuit, considering the circuit height
         for i in range(self.n_circuits):
-            self.model += self.x[i] + self.widths[i] <= self.board_height
+            self.model += self.y[i] + self.heights[i] <= self.board_height
 
         # Add constraint that circuits do not overlap
         for i in range(self.n_circuits):
             for j in range(i + 1, self.n_circuits):
                 # i-th circuit placed on the left of j-th circuit
                 self.model += self.x[i] + self.widths[i] <= \
-                              self.x[j] + (1 - self.z_1[i * self.n_circuits + j]) * self.height_upper_bound
+                              self.x[j] + (1 - self.z_1[i * self.n_circuits + j]) * self.board_width
                 # i-th circuit placed on the right of j-th circuit
                 self.model += self.x[j] + self.widths[j] <= \
-                              self.x[i] + (1 - self.z_1[j * self.n_circuits + i]) * self.height_upper_bound
+                              self.x[i] + (1 - self.z_1[j * self.n_circuits + i]) * self.board_width
                 # i-th circuit placed above j-th circuit
-                self.model += self.y[i] - self.heights[i] >= \
-                              self.y[j] - (1 - self.z_2[i * self.n_circuits + j]) * self.board_width
-                # i-th circuit not on the left of j-th circuit when it is above
-                self.model += self.y[j] - self.heights[j] >= \
-                              self.y[i] - (1 - self.z_2[j * self.n_circuits + i]) * self.board_width
+                self.model += self.y[i] >= \
+                              self.y[j] + self.heights[j] - (1 - self.z_2[i * self.n_circuits + j]) * self.height_upper_bound
+                # j-th circuit placed above i-th circuit
+                self.model += self.y[j] >= \
+                              self.y[i] + self.heights[i] - (1 - self.z_2[j * self.n_circuits + i]) * self.height_upper_bound
                 # logic proposition only one
                 self.model += self.z_1[i * self.n_circuits + j] + self.z_1[j * self.n_circuits + i] + \
                               self.z_2[i * self.n_circuits + j] + self.z_2[j * self.n_circuits + i] == 1
@@ -261,31 +269,27 @@ class S1BMPulpModel(SPulpModel):
     def _add_model_specific_constraints(self):
         # Enforce board height to be the maximum y coordinate of any circuit, considering the circuit height
         for i in range(self.n_circuits):
-            self.model += self.x[i] + self.widths[i] <= self.board_height
+            self.model += self.y[i] + self.heights[i] <= self.board_height
 
         # Add constraint that circuits do not overlap
         for i in range(self.n_circuits):
             for j in range(i + 1, self.n_circuits):
-                # i-th circuit placed on the left of j-th circuit
                 self.model += self.x[i] + self.widths[i] <= \
-                              self.x[j] + (1 - self.z_1[i * self.n_circuits + j]) * self.height_upper_bound
-                # i-th circuit placed on the right of j-th circuit
+                              self.x[j] + (1 - self.z_1[i * self.n_circuits + j]) * self.board_width
                 self.model += self.x[j] + self.widths[j] <= \
-                              self.x[i] + (1 - self.z_1[j * self.n_circuits + i]) * self.height_upper_bound
-                # i-th circuit placed above j-th circuit
-                self.model += self.y[i] - self.heights[i] >= \
-                              self.y[j] - (1 - self.z_2[i * self.n_circuits + j]) * self.board_width
+                              self.x[i] + (1 - self.z_1[j * self.n_circuits + i]) * self.board_width
+                self.model += self.y[i] >= \
+                              self.y[j] + self.heights[j] - (1 - self.z_2[i * self.n_circuits + j]) * self.height_upper_bound
                 self.model += self.x[i] + self.widths[i] >= \
-                              self.x[j] - (1 - self.z_2[i * self.n_circuits + j]) * self.height_upper_bound
+                              self.x[j] - (1 - self.z_2[i * self.n_circuits + j]) * self.board_width
                 self.model += self.x[j] + self.widths[j] >= \
-                              self.x[i] - (1 - self.z_2[i * self.n_circuits + j]) * self.height_upper_bound
-                # i-th circuit not on the left of j-th circuit when it is above
-                self.model += self.y[j] - self.heights[j] >= \
-                              self.y[i] - (1 - self.z_2[j * self.n_circuits + i]) * self.board_width
+                              self.x[i] - (1 - self.z_2[i * self.n_circuits + j]) * self.board_width
+                self.model += self.y[j] >= \
+                              self.y[i] + self.heights[i] - (1 - self.z_2[j * self.n_circuits + i]) * self.height_upper_bound
                 self.model += self.x[i] + self.widths[i] >= \
-                              self.x[j] - (1 - self.z_2[j * self.n_circuits + i]) * self.height_upper_bound
+                              self.x[j] - (1 - self.z_2[j * self.n_circuits + i]) * self.board_width
                 self.model += self.x[j] + self.widths[j] >= \
-                              self.x[i] - (1 - self.z_2[j * self.n_circuits + i]) * self.height_upper_bound
+                              self.x[i] - (1 - self.z_2[j * self.n_circuits + i]) * self.board_width
                 # logic proposition only one
                 self.model += self.z_1[i * self.n_circuits + j] + self.z_1[j * self.n_circuits + i] + \
                               self.z_2[i * self.n_circuits + j] + self.z_2[j * self.n_circuits + i] == 1
@@ -314,31 +318,27 @@ class S2BMPulpModel(SPulpModel):
     def _add_model_specific_constraints(self):
         # Enforce board height to be the maximum y coordinate of any circuit, considering the circuit height
         for i in range(self.n_circuits):
-            self.model += self.x[i] + self.widths[i] <= self.board_height
+            self.model += self.y[i] + self.heights[i] <= self.board_height
 
         # Add constraint that circuits do not overlap
         for i in range(self.n_circuits):
             for j in range(i + 1, self.n_circuits):
-                # i-th circuit placed on the left of j-th circuit
                 self.model += self.x[i] + self.widths[i] <= \
-                              self.x[j] + (1 - self.z_1[i * self.n_circuits + j]) * self.height_upper_bound
-                # i-th circuit placed on the right of j-th circuit
+                              self.x[j] + (1 - self.z_1[i * self.n_circuits + j]) * self.board_width
                 self.model += self.x[j] + self.widths[j] <= \
-                              self.x[i] + (1 - self.z_1[j * self.n_circuits + i]) * self.height_upper_bound
-                # i-th circuit placed above j-th circuit
-                self.model += self.y[i] - self.heights[i] >= \
-                              self.y[j] - (1 - self.z_2[i * self.n_circuits + j]) * self.board_width
+                              self.x[i] + (1 - self.z_1[j * self.n_circuits + i]) * self.board_width
+                self.model += self.y[i] >= \
+                              self.y[j] + self.heights[j] - (1 - self.z_2[i * self.n_circuits + j]) * self.height_upper_bound
                 self.model += self.x[i] + self.widths[i] >= \
-                              self.x[j] + 1 - (1 - self.z_2[i * self.n_circuits + j]) * self.height_upper_bound
+                              self.x[j] + 1 - (1 - self.z_2[i * self.n_circuits + j]) * self.board_width
                 self.model += self.x[j] + self.widths[j] >= \
-                              self.x[i] + 1 - (1 - self.z_2[i * self.n_circuits + j]) * self.height_upper_bound
-                # i-th circuit not on the left of j-th circuit when it is above
-                self.model += self.y[j] - self.heights[j] >= \
-                              self.y[i] - (1 - self.z_2[j * self.n_circuits + i]) * self.board_width
+                              self.x[i] + 1 - (1 - self.z_2[i * self.n_circuits + j]) * self.board_width
+                self.model += self.y[j] >= \
+                              self.y[i] + self.heights[i] - (1 - self.z_2[j * self.n_circuits + i]) * self.height_upper_bound
                 self.model += self.x[i] + self.widths[i] >= \
-                              self.x[j] + 1 - (1 - self.z_2[j * self.n_circuits + i]) * self.height_upper_bound
+                              self.x[j] + 1 - (1 - self.z_2[j * self.n_circuits + i]) * self.board_width
                 self.model += self.x[j] + self.widths[j] >= \
-                              self.x[i] + 1 - (1 - self.z_2[j * self.n_circuits + i]) * self.height_upper_bound
+                              self.x[i] + 1 - (1 - self.z_2[j * self.n_circuits + i]) * self.board_width
                 # logic proposition only one
                 self.model += self.z_1[i * self.n_circuits + j] + self.z_1[j * self.n_circuits + i] + \
                               self.z_2[i * self.n_circuits + j] + self.z_2[j * self.n_circuits + i] == 1
