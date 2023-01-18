@@ -78,7 +78,6 @@ def bfdh_upper_bound(widths: np.ndarray, heights: np.ndarray, board_width: int):
 
 
 def kp01_upper_bound(widths: np.ndarray, heights: np.ndarray, board_width: int):
-    unpacked_rectangles = list(heights.argsort()[::-1])
     solution = {
         'n_circuits': widths.size,
         'widths': widths,
