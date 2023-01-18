@@ -23,8 +23,7 @@ SOLVERS = {
 
 class SPulpModelRotation(ABC):
     def __init__(self, n_circuits: int, board_width: int, widths: typing.List[int], heights: typing.List[int],
-                 height_lower_bound: int, height_upper_bound: int, activate_symmetry_breaking: bool = False,
-                 use_warm_start: bool = True):
+                 height_lower_bound: int, height_upper_bound: int, use_warm_start: bool = True):
         self.solver = None
         self.n_circuits = n_circuits
         self.board_width = board_width
@@ -32,7 +31,6 @@ class SPulpModelRotation(ABC):
         self.heights = heights
         self.height_lower_bound = height_lower_bound
         self.height_upper_bound = height_upper_bound
-        self.activate_symmetry_breaking = activate_symmetry_breaking
         self.use_warm_start = use_warm_start
         self.time_limit = 300
         self.set_solver("GUROBI_CMD")
@@ -40,13 +38,13 @@ class SPulpModelRotation(ABC):
 
     @staticmethod
     @abstractmethod
-    def from_instance_json(json_filepath: str, activate_symmetry_breaking: bool, use_warm_start: bool) \
+    def from_instance_json(json_filepath: str, use_warm_start: bool) \
             -> "SPulpModelRotation":
         pass
 
     @staticmethod
     @abstractmethod
-    def from_dict(instance_dict: dict, activate_symmetry_breaking: bool, use_warm_start: bool) -> "SPulpModelRotation":
+    def from_dict(instance_dict: dict, use_warm_start: bool) -> "SPulpModelRotation":
         pass
 
     def set_time_limit(self, time_limit: int) -> None:
@@ -120,40 +118,6 @@ class SPulpModelRotation(ABC):
     @abstractmethod
     def _add_model_specific_constraints(self, *args, **kwargs):
         pass
-
-    def _same_sized_circuits_constraints(self):
-        for i in range(self.n_circuits):
-            for j in range(i + 1, self.n_circuits):
-                if self.widths[i] == self.widths[j] and self.heights[i] == self.heights[j]:
-                    self.model += self.z_1[j * self.n_circuits + i] == 0
-                    self.model += self.z_1[i * self.n_circuits + j] + self.z_2[j * self.n_circuits + i] == 1
-
-    def _large_circuits_constraints(self):
-        for i in range(self.n_circuits):
-            for j in range(i + 1, self.n_circuits):
-                if self.widths[i] + self.widths[j] > self.board_width:
-                    self.model += self.z_1[i * self.n_circuits + j] == 0
-                    self.model += self.z_1[j * self.n_circuits + i] == 0
-                if self.heights[i] + self.heights[j] > self.height_upper_bound:
-                    self.model += self.z_2[i * self.n_circuits + j] == 0
-                    self.model += self.z_2[j * self.n_circuits + i] == 0
-
-    def _add_symmetry_breaking_constraint(self):
-        areas = [self.widths[i] * self.heights[i] for i in range(self.n_circuits)]
-        sorted_indexes = [i for _, i in sorted(zip(areas, range(self.n_circuits)), reverse=True)]
-
-        biggest_circuit_x_upper_bound = (self.board_height - self.widths[sorted_indexes[0]]) // 2
-        biggest_circuit_y_upper_bound = (self.height_upper_bound + self.heights[sorted_indexes[0]]) // 2
-
-        self.model += self.x[sorted_indexes[0]] <= biggest_circuit_x_upper_bound
-        self.model += self.y[sorted_indexes[0]] <= biggest_circuit_y_upper_bound
-
-        for i in range(self.n_circuits):
-            if self.widths[i] > biggest_circuit_x_upper_bound:
-                self.model += self.z_1[i * self.n_circuits + sorted_indexes[0]] == 0
-            if self.heights[i] > biggest_circuit_y_upper_bound:
-                self.model += self.z_2[i * self.n_circuits + sorted_indexes[0]] == 0
-
     def _define_objective(self):
         self.model += self.board_height
 
@@ -161,11 +125,7 @@ class SPulpModelRotation(ABC):
         self._init_variables()
         self._define_objective()
         self._rotation_constraints()
-        self._large_circuits_constraints()
-        self._same_sized_circuits_constraints()
         self._add_model_specific_constraints()
-        if self.activate_symmetry_breaking:
-            self._add_symmetry_breaking_constraint()
 
         if self.use_warm_start:
             self._warm_start_solver()
@@ -177,12 +137,18 @@ class SPulpModelRotation(ABC):
             xs.append(self.x[i].roundedValue())
             ys.append(self.y[i].roundedValue())
 
+        widths = []
+        heights = []
+        for i in range(self.n_circuits):
+            widths.append(self.actual_widths[i].roundedValue())
+            heights.append(self.actual_heights[i].roundedValue())
+
         return {
             'board_width': self.board_width,
             'board_height': self.board_height.varValue,
             'n_circuits': self.n_circuits,
-            'widths': self.widths,
-            'heights': self.heights,
+            'widths': widths,
+            'heights': heights,
             'x': xs,
             'y': ys
         }
@@ -223,23 +189,22 @@ class SPulpModelRotation(ABC):
 
 class SGBMPulpModelRotation(SPulpModelRotation):
     def __init__(self, n_circuits: int, board_width: int, widths: typing.List[int], heights: typing.List[int],
-                 height_lower_bound: int, height_upper_bound: int, activate_symmetry_breaking: bool = False,
-                 use_warm_start: bool = True):
+                 height_lower_bound: int, height_upper_bound: int, use_warm_start: bool = True):
         super().__init__(n_circuits, board_width, widths, heights, height_lower_bound, height_upper_bound,
-                         activate_symmetry_breaking, use_warm_start)
+                         use_warm_start)
 
     @staticmethod
-    def from_instance_json(json_filepath: str, activate_symmetry_breaking: bool = False, use_warm_start: bool = True) \
+    def from_instance_json(json_filepath: str, use_warm_start: bool = True) \
             -> "SGBMPulpModelRotation":
         with open(json_filepath, 'r') as f:
             instance_dict = json.load(f)
 
-        return SGBMPulpModelRotation(**instance_dict, activate_symmetry_breaking=False, use_warm_start=use_warm_start)
+        return SGBMPulpModelRotation(**instance_dict, use_warm_start=use_warm_start)
 
     @staticmethod
-    def from_dict(instance_dict: dict, activate_symmetry_breaking: bool = False, use_warm_start: bool = True) \
+    def from_dict(instance_dict: dict, use_warm_start: bool = True) \
             -> "SGBMPulpModelRotation":
-        return SGBMPulpModelRotation(**instance_dict, activate_symmetry_breaking=False, use_warm_start=use_warm_start)
+        return SGBMPulpModelRotation(**instance_dict, use_warm_start=use_warm_start)
 
     def _add_model_specific_constraints(self):
         # Enforce board height to be the maximum y coordinate of any circuit, considering the circuit height
@@ -270,23 +235,23 @@ class SGBMPulpModelRotation(SPulpModelRotation):
 
 class S1BMPulpModelRotation(SPulpModelRotation):
     def __init__(self, n_circuits: int, board_width: int, widths: typing.List[int], heights: typing.List[int],
-                 height_lower_bound: int, height_upper_bound: int, activate_symmetry_breaking: bool = False,
+                 height_lower_bound: int, height_upper_bound: int,
                  use_warm_start: bool = True):
         super().__init__(n_circuits, board_width, widths, heights, height_lower_bound, height_upper_bound,
-                         activate_symmetry_breaking, use_warm_start)
+                         use_warm_start)
 
     @staticmethod
-    def from_instance_json(json_filepath: str, activate_symmetry_breaking: bool = False, use_warm_start: bool = True) \
+    def from_instance_json(json_filepath: str, use_warm_start: bool = True) \
             -> "S1BMPulpModelRotation":
         with open(json_filepath, 'r') as f:
             instance_dict = json.load(f)
 
-        return S1BMPulpModelRotation(**instance_dict, activate_symmetry_breaking=False, use_warm_start=use_warm_start)
+        return S1BMPulpModelRotation(**instance_dict, use_warm_start=use_warm_start)
 
     @staticmethod
-    def from_dict(instance_dict: dict, activate_symmetry_breaking: bool = False, use_warm_start: bool = True) \
+    def from_dict(instance_dict: dict, use_warm_start: bool = True) \
             -> "S1BMPulpModelRotation":
-        return S1BMPulpModelRotation(**instance_dict, activate_symmetry_breaking=False, use_warm_start=use_warm_start)
+        return S1BMPulpModelRotation(**instance_dict, use_warm_start=use_warm_start)
 
     def _add_model_specific_constraints(self):
         # Enforce board height to be the maximum y coordinate of any circuit, considering the circuit height
@@ -321,23 +286,22 @@ class S1BMPulpModelRotation(SPulpModelRotation):
 
 class S2BMPulpModelRotation(SPulpModelRotation):
     def __init__(self, n_circuits: int, board_width: int, widths: typing.List[int], heights: typing.List[int],
-                 height_lower_bound: int, height_upper_bound: int, activate_symmetry_breaking: bool = False,
+                 height_lower_bound: int, height_upper_bound: int,
                  use_warm_start: bool = True):
         super().__init__(n_circuits, board_width, widths, heights, height_lower_bound, height_upper_bound,
-                         activate_symmetry_breaking, use_warm_start)
+                         use_warm_start)
 
     @staticmethod
-    def from_instance_json(json_filepath: str, activate_symmetry_breaking: bool = False, use_warm_start: bool = True) \
+    def from_instance_json(json_filepath: str, use_warm_start: bool = True) \
             -> "S2BMPulpModelRotation":
         with open(json_filepath, 'r') as f:
             instance_dict = json.load(f)
 
-        return S2BMPulpModelRotation(**instance_dict, activate_symmetry_breaking=False, use_warm_start=use_warm_start)
+        return S2BMPulpModelRotation(**instance_dict, use_warm_start=use_warm_start)
 
     @staticmethod
-    def from_dict(instance_dict: dict, activate_symmetry_breaking: bool = False,
-                  use_warm_start: bool = True) -> "S2BMPulpModelRotation":
-        return S2BMPulpModelRotation(**instance_dict, activate_symmetry_breaking=False, use_warm_start=use_warm_start)
+    def from_dict(instance_dict: dict, use_warm_start: bool = True) -> "S2BMPulpModelRotation":
+        return S2BMPulpModelRotation(**instance_dict, use_warm_start=use_warm_start)
 
     def _add_model_specific_constraints(self):
         # Enforce board height to be the maximum y coordinate of any circuit, considering the circuit height
