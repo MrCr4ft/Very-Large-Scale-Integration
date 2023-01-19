@@ -1,6 +1,7 @@
 import typing
 import json
 from time import perf_counter
+import tqdm
 
 from z3 import *
 import numpy as np
@@ -117,7 +118,7 @@ class SATStripPackingModel:
     def _no_overlapping_constraints(self):
         constraints = list()
 
-        for i in range(self.n_circuits):
+        for i in tqdm.tqdm(range(self.n_circuits), "Generating non overlapping constraints..."):
             for j in range(i + 1, self.n_circuits):
                 for domain_var in range(-1, self.board_width - self.widths[i]):
                     if domain_var + self.widths[i] <= self.board_width - self.widths[j]:
