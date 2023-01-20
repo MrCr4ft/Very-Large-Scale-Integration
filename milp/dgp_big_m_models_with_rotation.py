@@ -23,7 +23,8 @@ SOLVERS = {
 
 class SPulpModelRotation(ABC):
     def __init__(self, n_circuits: int, board_width: int, widths: typing.List[int], heights: typing.List[int],
-                 height_lower_bound: int, height_upper_bound: int, use_warm_start: bool = True):
+                 height_lower_bound: int, height_upper_bound: int, use_warm_start: bool = True,
+                 activate_symmetry_breaking: bool = True):
         self.solver = None
         self.n_circuits = n_circuits
         self.board_width = board_width
@@ -32,6 +33,7 @@ class SPulpModelRotation(ABC):
         self.height_lower_bound = height_lower_bound
         self.height_upper_bound = height_upper_bound
         self.use_warm_start = use_warm_start
+        self.activate_symmetry_breaking = activate_symmetry_breaking
         self.time_limit_ms = 300000
         self.set_solver("GUROBI_CMD")
         self.solver_name = "GUROBI_CMD"
@@ -39,8 +41,8 @@ class SPulpModelRotation(ABC):
 
     @staticmethod
     @abstractmethod
-    def from_instance_json(json_filepath: str, use_warm_start: bool, *args, **kwargs) \
-            -> "SPulpModelRotation":
+    def from_instance_json(json_filepath: str, use_warm_start: bool, activate_symmetry_breaking: bool,
+                           *args, **kwargs) -> "SPulpModelRotation":
         pass
 
     @staticmethod
@@ -91,6 +93,11 @@ class SPulpModelRotation(ABC):
                     range(self.n_circuits)
                     for j in range(self.n_circuits)]
 
+    def _symmetry_breaking_constraints(self):
+        for i in range(self.n_circuits):
+            if self.widths[i] == self.heights[i]:
+                self.model += self.rotated[i] == 0
+
     def _warm_start_solver(self):
         initial_solution = kp01_upper_bound(np.array(self.widths), np.array(self.heights), self.board_width)
         for i in range(self.n_circuits):
@@ -128,6 +135,8 @@ class SPulpModelRotation(ABC):
         self._init_variables()
         self._define_objective()
         self._rotation_constraints()
+        if self.activate_symmetry_breaking:
+            self._symmetry_breaking_constraints()
         self._add_model_specific_constraints()
 
         if self.use_warm_start:
@@ -195,17 +204,19 @@ class SPulpModelRotation(ABC):
 
 class SGBMPulpModelRotation(SPulpModelRotation):
     def __init__(self, n_circuits: int, board_width: int, widths: typing.List[int], heights: typing.List[int],
-                 height_lower_bound: int, height_upper_bound: int, use_warm_start: bool = True):
+                 height_lower_bound: int, height_upper_bound: int, use_warm_start: bool = True,
+                 activate_symmetry_breaking: bool = True):
         super().__init__(n_circuits, board_width, widths, heights, height_lower_bound, height_upper_bound,
-                         use_warm_start)
+                         use_warm_start, activate_symmetry_breaking)
 
     @staticmethod
-    def from_instance_json(json_filepath: str, use_warm_start: bool = True, *args, **kwargs) \
-            -> "SGBMPulpModelRotation":
+    def from_instance_json(json_filepath: str, use_warm_start: bool = True, activate_symmetry_breaking: bool = True,
+                           *args, **kwargs) -> "SGBMPulpModelRotation":
         with open(json_filepath, 'r') as f:
             instance_dict = json.load(f)
 
-        return SGBMPulpModelRotation(**instance_dict, use_warm_start=use_warm_start)
+        return SGBMPulpModelRotation(**instance_dict, use_warm_start=use_warm_start,
+                                     activate_symmetry_breaking=activate_symmetry_breaking)
 
     @staticmethod
     def from_dict(instance_dict: dict, use_warm_start: bool = True) \
@@ -241,18 +252,19 @@ class SGBMPulpModelRotation(SPulpModelRotation):
 
 class S1BMPulpModelRotation(SPulpModelRotation):
     def __init__(self, n_circuits: int, board_width: int, widths: typing.List[int], heights: typing.List[int],
-                 height_lower_bound: int, height_upper_bound: int,
-                 use_warm_start: bool = True):
+                 height_lower_bound: int, height_upper_bound: int, use_warm_start: bool = True,
+                 activate_symmetry_breaking: bool = True):
         super().__init__(n_circuits, board_width, widths, heights, height_lower_bound, height_upper_bound,
-                         use_warm_start)
+                         use_warm_start, activate_symmetry_breaking)
 
     @staticmethod
-    def from_instance_json(json_filepath: str, use_warm_start: bool = True, *args, **kwargs) \
-            -> "S1BMPulpModelRotation":
+    def from_instance_json(json_filepath: str, use_warm_start: bool = True, activate_symmetry_breaking: bool = True,
+                           *args, **kwargs) -> "S1BMPulpModelRotation":
         with open(json_filepath, 'r') as f:
             instance_dict = json.load(f)
 
-        return S1BMPulpModelRotation(**instance_dict, use_warm_start=use_warm_start)
+        return S1BMPulpModelRotation(**instance_dict, use_warm_start=use_warm_start,
+                                     activate_symmetry_breaking=activate_symmetry_breaking)
 
     @staticmethod
     def from_dict(instance_dict: dict, use_warm_start: bool = True) \
@@ -292,17 +304,19 @@ class S1BMPulpModelRotation(SPulpModelRotation):
 
 class S2BMPulpModelRotation(SPulpModelRotation):
     def __init__(self, n_circuits: int, board_width: int, widths: typing.List[int], heights: typing.List[int],
-                 height_lower_bound: int, height_upper_bound: int,
-                 use_warm_start: bool = True):
+                 height_lower_bound: int, height_upper_bound: int, use_warm_start: bool = True,
+                 activate_symmetry_breaking: bool = True):
         super().__init__(n_circuits, board_width, widths, heights, height_lower_bound, height_upper_bound,
-                         use_warm_start)
+                         use_warm_start, activate_symmetry_breaking)
 
     @staticmethod
-    def from_instance_json(json_filepath: str, use_warm_start: bool = True, *args, **kwargs) -> "S2BMPulpModelRotation":
+    def from_instance_json(json_filepath: str, use_warm_start: bool = True, activate_symmetry_breaking: bool = True,
+                           *args, **kwargs) -> "S2BMPulpModelRotation":
         with open(json_filepath, 'r') as f:
             instance_dict = json.load(f)
 
-        return S2BMPulpModelRotation(**instance_dict, use_warm_start=use_warm_start)
+        return S2BMPulpModelRotation(**instance_dict, use_warm_start=use_warm_start,
+                                     activate_symmetry_breaking=activate_symmetry_breaking)
 
     @staticmethod
     def from_dict(instance_dict: dict, use_warm_start: bool = True) -> "S2BMPulpModelRotation":
