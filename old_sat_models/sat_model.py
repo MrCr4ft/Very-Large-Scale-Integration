@@ -189,7 +189,9 @@ def get_initial_model(n_rectangles: int, board_width: int, height_lower_bound: i
     ud = [[Bool(f"ud_{i + 1}_{j + 1}") for j in range(n_rectangles)] for i in range(n_rectangles)]
 
     x_axiom_clauses = axiom_clauses(list(range(n_rectangles)), x_lower_bounds, x_upper_bounds, x_order_encoding)
+    print("x_axiom_clauses", x_axiom_clauses)
     y_axiom_clauses = axiom_clauses(list(range(n_rectangles)), y_lower_bounds, y_upper_bounds, y_order_encoding)
+    print("y_axiom_clauses", y_axiom_clauses)
 
     non_overlapping_constraints_ = non_overlapping_by_standard_linear_encoding(n_rectangles,
                                                                                x_order_encoding,
@@ -202,6 +204,7 @@ def get_initial_model(n_rectangles: int, board_width: int, height_lower_bound: i
                                                                                heights,
                                                                                lr,
                                                                                ud)
+    print("non_overlapping_constraints_", non_overlapping_constraints_)
 
     h_order_encoding = get_order_encoding_variables("h", 1, [height_lower_bound], [height_upper_bound])
     h_axiom_clauses = axiom_clauses([0], [height_lower_bound], [height_upper_bound], h_order_encoding)

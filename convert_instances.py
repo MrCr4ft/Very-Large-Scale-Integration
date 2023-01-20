@@ -22,7 +22,8 @@ def height_lower_and_upper_bounds(widths: typing.List[int], heights: typing.List
         -> typing.Tuple[int, int]:
     widths = np.array(widths)
     heights = np.array(heights)
-    return int(lower_bound(widths, heights, board_width)), int(kp01_upper_bound(widths, heights, board_width))
+    return int(lower_bound(widths, heights, board_width)), \
+           int(kp01_upper_bound(widths, heights, board_width)['board_height'])
 
 
 def convert_instance_to_dzn_format(instance: str, dzn_parnames: typing.Dict[str, str]) -> typing.List[str]:
