@@ -39,7 +39,8 @@ def get_cmap(n, name='hsv'):
 
 def draw_board(board_width: int, board_height: int, n_circuits: int, widths: typing.List[int],
                heights: typing.List[int], x: typing.List[int], y: typing.List[int],
-               output_file: str = None, color_map: str = None, shuffle_colors: bool = True):
+               output_file: str = None, display_solution: bool = False,
+               color_map: str = None, shuffle_colors: bool = True):
     fig = plt.figure()
     ax = fig.add_subplot(111)
 
@@ -60,11 +61,12 @@ def draw_board(board_width: int, board_height: int, n_circuits: int, widths: typ
     if output_file is not None:
         plt.savefig(output_file)
 
-    plt.show()
+    if display_solution:
+        plt.show()
 
 
-def dict_to_dzn(board_width: int, board_height: int, n_circuits: int, widths: typing.List[int],
-                heights: typing.List[int], x: typing.List[int], y: typing.List[int]):
+def to_dzn_input(board_width: int, board_height: int, n_circuits: int, widths: typing.List[int],
+                 heights: typing.List[int], x: typing.List[int], y: typing.List[int]):
     dzn = "board_width = %d;\n" % board_width
     dzn += "board_height = %d;\n" % board_height
     dzn += "n_circuits = %d;\n" % n_circuits
@@ -74,3 +76,31 @@ def dict_to_dzn(board_width: int, board_height: int, n_circuits: int, widths: ty
     dzn += "y = [%s];\n" % ", ".join([str(y_) for y_ in y])
 
     return dzn
+
+
+def is_a_valid_solution(board_width: int, board_height: int, n_circuits: int, widths: typing.List[int],
+                        heights: typing.List[int], x: typing.List[int], y: typing.List[int]):
+    for i in range(n_circuits):
+        if x[i] < 0 or x[i] + widths[i] > board_width:
+            return False
+        if y[i] < 0 or y[i] + heights[i] > board_height:
+            return False
+        for j in range(i + 1, n_circuits):
+            if not (
+                    (x[i] + widths[i] <= x[j]) or
+                    (x[j] + widths[j] <= x[i]) or
+                    (y[i] + heights[i] <= y[j]) or
+                    (y[j] + heights[j] <= y[i])
+            ):
+                return False
+    return True
+
+
+def solution_to_txt(board_width: int, board_height: int, n_circuits: int, widths: typing.List[int],
+                    heights: typing.List[int], x: typing.List[int], y: typing.List[int]):
+    txt = "{} {}\n".format(board_width, board_height)
+    txt += "{}\n".format(n_circuits)
+    for i in range(n_circuits):
+        txt += "{} {} {} {}\n".format(widths[i], heights[i], x[i], y[i])
+
+    return txt
