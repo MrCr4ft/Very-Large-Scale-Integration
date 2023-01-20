@@ -34,13 +34,15 @@ class SPulpModel(ABC):
         self.height_upper_bound = height_upper_bound
         self.activate_symmetry_breaking = activate_symmetry_breaking
         self.use_warm_start = use_warm_start
-        self.time_limit = 300
+        self.time_limit_ms = 300000
         self.set_solver("GUROBI_CMD")
-        print("Solver set to GUROBI CMD by default. Change solver if needed.")
+        self.solver_name = "GUROBI_CMD"
+        print("Default solver is GUROBI CMD. Change solver if needed.")
 
     @staticmethod
     @abstractmethod
-    def from_instance_json(json_filepath: str, activate_symmetry_breaking: bool, use_warm_start: bool) -> "SPulpModel":
+    def from_instance_json(json_filepath: str, activate_symmetry_breaking: bool, use_warm_start: bool,
+                           *args, **kwargs) -> "SPulpModel":
         pass
 
     @staticmethod
@@ -48,17 +50,19 @@ class SPulpModel(ABC):
     def from_dict(instance_dict: dict, activate_symmetry_breaking: bool, use_warm_start: bool) -> "SPulpModel":
         pass
 
-    def set_time_limit(self, time_limit: int) -> None:
-        self.time_limit = time_limit
-        print("Time limit set to {}".format(time_limit))
+    def set_time_limit(self, time_limit_ms: int) -> None:
+        self.time_limit_ms = time_limit_ms
+        print("Time limit set to {}".format(time_limit_ms))
+        self.solver = SOLVERS[self.solver_name](self.time_limit_ms)
 
     def set_solver(self, solver_name: str):
         if solver_name not in SOLVERS:
             raise ValueError("Solver %s not supported." % solver_name)
-        self.solver = SOLVERS[solver_name](self.time_limit)
+        self.solver_name = solver_name
+        self.solver = SOLVERS[solver_name](self.time_limit_ms)
 
     # These are common to all models, so we can implement them here
-    def _init_variables(self, *args, **kwargs):
+    def _init_variables(self):
         self.model = pl.LpProblem("S1BM", pl.LpMinimize)
 
         # Define target variable, the height of the board
@@ -166,7 +170,7 @@ class SPulpModel(ABC):
             'y': ys
         }
 
-    def solve(self):
+    def solve(self, *args, **kwargs) -> typing.Tuple[typing.Dict[str, typing.Any], int, bool]:
         start_time = perf_counter()
 
         print("Building model using Pulp...")
@@ -176,28 +180,32 @@ class SPulpModel(ABC):
         print("It took %.2f seconds to build the model" % (end_time - start_time))
 
         # Solve the model
+        print("Solving the model...")
+        print("The time limit is %.3f seconds" % (self.time_limit_ms / 1000))
         start_time = perf_counter()
-        print("Solving the model")
         self.model.solve(self.solver)
         end_time = perf_counter()
 
-        time_limit_exceeded = np.ceil(end_time - start_time) >= self.time_limit
+        elapsed_time = np.ceil((end_time - start_time) * 1000)
+        time_limit_exceeded = elapsed_time >= self.time_limit_ms
 
         print("Accessing to the status of the model...")
         print("The status of the model is %s" % pl.LpStatus[self.model.status])
 
         if self.model.status == 1:
-            print("Model solved")
-        elif time_limit_exceeded:
+            print("Model solved optimally")
+        elif time_limit_exceeded or self.model.status == 0:
             print("Time limit exceeded")
-        else:
+        elif self.model.status == -1:
             print("Model unsatisfiable")
+        else:
+            raise Exception("Unexpected status of the model")
 
-        if time_limit_exceeded:
-            return None
+        if self.model.status == 0 or self.model.status == -1:
+            return None, self.time_limit_ms, False
 
         # Get the solution
-        return self._retrieve_solution()
+        return self._retrieve_solution(), elapsed_time, self.model.status == 1
 
 
 class SGBMPulpModel(SPulpModel):
@@ -208,7 +216,8 @@ class SGBMPulpModel(SPulpModel):
                          activate_symmetry_breaking, use_warm_start)
 
     @staticmethod
-    def from_instance_json(json_filepath: str, activate_symmetry_breaking: bool = False, use_warm_start: bool = True) \
+    def from_instance_json(json_filepath: str, activate_symmetry_breaking: bool = False, use_warm_start: bool = True,
+                           *args, **kwargs) \
             -> "SGBMPulpModel":
         with open(json_filepath, 'r') as f:
             instance_dict = json.load(f)
@@ -254,7 +263,8 @@ class S1BMPulpModel(SPulpModel):
 
 
     @staticmethod
-    def from_instance_json(json_filepath: str, activate_symmetry_breaking: bool = False, use_warm_start: bool = True) \
+    def from_instance_json(json_filepath: str, activate_symmetry_breaking: bool = False, use_warm_start: bool = True,
+                           *args, **kwargs) \
             -> "S1BMPulpModel":
         with open(json_filepath, 'r') as f:
             instance_dict = json.load(f)
@@ -303,7 +313,8 @@ class S2BMPulpModel(SPulpModel):
                          activate_symmetry_breaking, use_warm_start)
 
     @staticmethod
-    def from_instance_json(json_filepath: str, activate_symmetry_breaking: bool = False, use_warm_start: bool = True) \
+    def from_instance_json(json_filepath: str, activate_symmetry_breaking: bool = False, use_warm_start: bool = True,
+                           *args, **kwargs) \
             -> "S2BMPulpModel":
         with open(json_filepath, 'r') as f:
             instance_dict = json.load(f)

@@ -8,11 +8,14 @@ from numpy import ndarray
 from pulp import *
 import numpy as np
 
+
 SOLVERS = {
     "GUROBI_CMD": lambda time_limit: pl.GUROBI_CMD(msg=True, timeLimit=time_limit, options=[("MIPFocus", 1)]),
     "GUROBI_PY": lambda time_limit: pl.GUROBI(msg=True, timeLimit=time_limit),
-    "CPLEX_CMD": lambda time_limit: pl.CPLEX_CMD(msg=True, timeLimit=time_limit,
-                                             options=["set mip tolerances integrality 1e-05", "set emphasis mip 1"]),
+    "CPLEX_CMD": lambda time_limit: pl.CPLEX_CMD(msg=True,
+                                                 timeLimit=time_limit,
+                                                 options=["set mip tolerances integrality 1e-05",
+                                                          "set emphasis mip 1"]),
     "GLPK": lambda time_limit: pl.GLPK_CMD(msg=True, timeLimit=time_limit),
     "PULP_CBC": lambda time_limit: pl.PULP_CBC_CMD(msg=True, timeLimit=time_limit),
     "CPLEX_PY": lambda time_limit: pl.CPLEX_PY(msg=True, timeLimit=time_limit),
@@ -45,9 +48,9 @@ class PCMILPProblem(ABC):
         self.heights = heights
         self.height_lower_bound = height_lower_bound
         self.height_upper_bound = height_upper_bound
-        self.time_limit = 300
+        self.time_limit_ms = 300000
         self.set_solver("GUROBI_CMD")
-        print("Solver set to GUROBI CMD by default. Change solver if needed.")
+        print("Default solver is GUROBI CMD. Change solver if needed.")
         self.__compute_circuits_demands()
 
     def __compute_circuits_demands(self):
@@ -67,12 +70,11 @@ class PCMILPProblem(ABC):
         pass
 
     def set_solver(self, solver_name: str) -> None:
-        self.solver = SOLVERS[solver_name](self.time_limit)
-        print("Solver set to {}".format(solver_name))
+        self.solver = SOLVERS[solver_name](self.time_limit_ms / 1000)
 
-    def set_time_limit(self, time_limit: int) -> None:
-        self.time_limit = time_limit
-        print("Time limit set to {}".format(time_limit))
+    def set_time_limit(self, time_limit_ms: int) -> None:
+        self.time_limit_ms = time_limit_ms
+        self.set_solver(self.solver.name)
 
     def _set_board_height(self, board_height: int) -> None:
         self.board_height = board_height
@@ -109,7 +111,7 @@ class PCMILPProblem(ABC):
         pass
 
     @abstractmethod
-    def solve(self, *args, **kwargs) -> typing.Dict[str, typing.Any]:
+    def solve(self, *args, **kwargs) -> typing.Tuple[typing.Dict[str, typing.Any], int, bool]:
         pass
 
 
@@ -120,7 +122,7 @@ class PCMILPProblemNoRotation(PCMILPProblem):
                          height_upper_bound)
 
     @staticmethod
-    def from_instance_json(json_filepath: str) -> "PCMILPProblemNoRotation":
+    def from_instance_json(json_filepath: str, *args, **kwargs) -> "PCMILPProblemNoRotation":
         with open(json_filepath) as instance_file:
             instance = json.load(instance_file)
             return PCMILPProblemNoRotation(**instance)
@@ -220,7 +222,7 @@ class PCMILPProblemNoRotation(PCMILPProblem):
 
         return len(widths), widths, heights, xs, ys
 
-    def solve(self) -> typing.Dict[str, typing.Any]:
+    def solve(self, *args, **kwargs) -> typing.Tuple[typing.Dict[str, typing.Any], int, bool]:
         lb = self.height_lower_bound
         ub = self.height_upper_bound
         # Linear search for the optimal height
@@ -239,12 +241,13 @@ class PCMILPProblemNoRotation(PCMILPProblem):
 
             # Solve the model
             print("Trying to solve the model with board height equal to %d..." % lb)
-            print("The time limit is %d seconds" % self.time_limit)
+            print("The time limit is %.3f seconds" % (self.time_limit_ms / 1000))
             start_time = perf_counter()
             model.solve(self.solver)
             end_time = perf_counter()
 
-            time_limit_exceeded = np.ceil(end_time - start_time) >= self.time_limit
+            elapsed_time = np.ceil((end_time - start_time) * 1000)
+            time_limit_exceeded = elapsed_time >= self.time_limit_ms
 
             print("Accessing to the status of the model...")
             print("The status of the model is %s" % pl.LpStatus[model.status])
@@ -252,15 +255,17 @@ class PCMILPProblemNoRotation(PCMILPProblem):
             if model.status == 1:
                 print("Model solved")
                 lb = ub + 1
-            elif time_limit_exceeded:
+            elif time_limit_exceeded or model.status == 0:
                 print("Time limit exceeded")
                 ub = lb - 1
-            else:
+            elif model.status == -1:
                 print("Unsatisfiable with height equal to %d" % lb)
                 lb += 1
+            else:
+                raise Exception("Unexpected status of the model")
 
-        if time_limit_exceeded:
-            return None
+        if time_limit_exceeded or model.status == 0:
+            return None, self.time_limit_ms, False
 
         # Get the solution
         n_circuits, widths, heights, xs, ys = self._retrieve_solution(x, valid_positions, correspondence_matrix)
@@ -273,7 +278,7 @@ class PCMILPProblemNoRotation(PCMILPProblem):
             'heights': heights,
             'x': xs,
             'y': ys
-        }
+        }, elapsed_time, True
 
 
 class PCMILPProblemRotation(PCMILPProblem):
@@ -283,7 +288,7 @@ class PCMILPProblemRotation(PCMILPProblem):
                          height_upper_bound)
 
     @staticmethod
-    def from_instance_json(json_filepath: str) -> "PCMILPProblemRotation":
+    def from_instance_json(json_filepath: str, *args, **kwargs) -> "PCMILPProblemRotation":
         with open(json_filepath) as instance_file:
             instance = json.load(instance_file)
             return PCMILPProblemRotation(**instance)
@@ -422,7 +427,7 @@ class PCMILPProblemRotation(PCMILPProblem):
 
         return len(widths), widths, heights, xs, ys
 
-    def solve(self) -> typing.Dict[str, typing.Any]:
+    def solve(self, *args, **kwargs) -> typing.Tuple[typing.Dict[str, typing.Any], int, bool]:
         lb = self.height_lower_bound
         ub = self.height_upper_bound
         # Linear search for the optimal height
@@ -443,12 +448,13 @@ class PCMILPProblemRotation(PCMILPProblem):
 
             # Solve the model
             print("Trying to solve the model with board height equal to %d..." % lb)
-            print("The time limit is %d seconds" % self.time_limit)
+            print("The time limit is %.3f seconds" % (self.time_limit_ms / 1000))
             start_time = perf_counter()
             model.solve(self.solver)
             end_time = perf_counter()
 
-            time_limit_exceeded = np.ceil(end_time - start_time) >= self.time_limit
+            elapsed_time = np.ceil((end_time - start_time) * 1000)
+            time_limit_exceeded = elapsed_time >= self.time_limit_ms
 
             print("Accessing to the status of the model...")
             print("The status of the model is %s" % pl.LpStatus[model.status])
@@ -456,15 +462,17 @@ class PCMILPProblemRotation(PCMILPProblem):
             if model.status == 1:
                 print("Model solved")
                 lb = ub + 1
-            elif time_limit_exceeded:
+            elif time_limit_exceeded or model.status == 0:
                 print("Time limit exceeded")
                 ub = lb - 1
-            else:
+            elif model.status == -1:
                 print("Unsatisfiable with height equal to %d" % lb)
                 lb += 1
+            else:
+                raise Exception("Unexpected status of the model")
 
-        if time_limit_exceeded:
-            return None
+        if time_limit_exceeded or model.status == 0:
+            return None, self.time_limit_ms, False
 
         # Get the solution
         n_circuits, widths, heights, xs, ys = self._retrieve_solution(x, y, valid_positions, valid_positions_rotated,
@@ -478,4 +486,4 @@ class PCMILPProblemRotation(PCMILPProblem):
             'heights': heights,
             'x': xs,
             'y': ys
-        }
+        },  elapsed_time, True
