@@ -89,45 +89,42 @@ class SATStripPackingModelNoRotation:
 
         return basic_constraints
 
+    def _non_overlapping_horizontally_constraints(self, i: int, j: int) -> typing.List[BoolRef]:
+        constraints = list()
+        for domain_var in range(-1, self.board_width - self.widths[i]):
+            if domain_var + self.widths[i] <= self.board_width - self.widths[j]:
+                constraints.append(
+                    Or(
+                    	Not(self.lr[i][j]),
+                        self.x_vars[i].order_encoding_booleans[domain_var + 1],
+                        Not(self.x_vars[j].order_encoding_booleans[domain_var + self.widths[i] + 1])
+                    )
+                )
+
+        return constraints
+
+    def _non_overlapping_vertically_constraints(self, i: int, j: int):
+        constraints = list()
+        for domain_var in range(-1, self.height_upper_bound - self.heights[i]):
+            if domain_var + self.heights[i] <= self.height_upper_bound - self.heights[j]:
+                constraints.append(
+                    Or(
+                    	Not(self.ud[i][j]),
+                        self.y_vars[i].order_encoding_booleans[domain_var + 1],
+                        Not(self.y_vars[j].order_encoding_booleans[domain_var + self.heights[i] + 1])
+                    )
+                )
+
+        return constraints
     def _no_overlapping_constraints(self) -> typing.List[BoolRef]:
         constraints = list()
 
         for i in tqdm.tqdm(range(self.n_circuits), "Generating non overlapping constraints..."):
             for j in range(i + 1, self.n_circuits):
-                for domain_var in range(-1, self.board_width - self.widths[i]):
-                    if domain_var + self.widths[i] <= self.board_width - self.widths[j]:
-                        constraints.append(
-                            Or(
-                                Not(self.lr[i][j]), self.x_vars[i].order_encoding_booleans[domain_var + 1],
-                                Not(self.x_vars[j].order_encoding_booleans[domain_var + 1 + self.widths[i]])
-                            )
-                        )
-                for domain_var in range(-1, self.board_width - self.widths[j]):
-                    if domain_var + self.widths[j] <= self.board_width - self.widths[i]:
-                        constraints.append(
-                            Or(
-                                Not(self.lr[j][i]), self.x_vars[j].order_encoding_booleans[domain_var + 1],
-                                Not(self.x_vars[i].order_encoding_booleans[domain_var + 1 + self.widths[j]])
-                            )
-                        )
-
-                for domain_var in range(-1, self.height_upper_bound - self.heights[i]):
-                    if domain_var + self.heights[i] <= self.height_upper_bound - self.heights[j]:
-                        constraints.append(
-                            Or(
-                                Not(self.ud[i][j]), self.y_vars[i].order_encoding_booleans[domain_var + 1],
-                                Not(self.y_vars[j].order_encoding_booleans[domain_var + 1 + self.heights[i]])
-                            )
-                        )
-                for domain_var in range(-1, self.height_upper_bound - self.heights[j]):
-                    if domain_var + self.heights[j] <= self.height_upper_bound - self.heights[i]:
-                        constraints.append(
-                            Or(
-                                Not(self.ud[j][i]), self.y_vars[j].order_encoding_booleans[domain_var + 1],
-                                Not(self.y_vars[i].order_encoding_booleans[domain_var + 1 + self.heights[j]])
-                            )
-                        )
-
+                constraints += self._non_overlapping_horizontally_constraints(i, j)
+                constraints += self._non_overlapping_horizontally_constraints(j, i)
+                constraints += self._non_overlapping_vertically_constraints(i, j)
+                constraints += self._non_overlapping_vertically_constraints(j, i)
                 constraints.append(Or(self.lr[i][j], self.lr[j][i], self.ud[i][j], self.ud[j][i]))
 
         return constraints
