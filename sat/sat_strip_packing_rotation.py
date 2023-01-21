@@ -120,80 +120,58 @@ class SATStripPackingModelRotation:
         basic_constraints += self._board_height_constraints()
 
         # 4. No overlap
-        basic_constraints += self._no_overlapping_constraints()
+        basic_constraints += self._non_overlapping_constraints_linear_inequality_enconding()
 
         # 5. Rotation constraints
-        #basic_constraints += self._rotation_constraints()
+        basic_constraints += self._rotation_constraints()
 
         # 6. Exclusive placing relationship implied constraints
-        # if self.add_implied_constraints:
-        basic_constraints += self._exclusive_constraints()
+        if self.add_implied_constraints:
+            basic_constraints += self._exclusive_constraints()
 
         # 7. Same sized circuits symmetry breaking
-        # if self.activate_symmetry_breaking:
-        #    basic_constraints += self._same_sized_circuits_symmetry_breaking_constraints()
+        if self.activate_symmetry_breaking:
+            basic_constraints += self._square_circuits_fixed_rotated_state()
 
         return basic_constraints
 
 
-    def _no_overlapping_two_elements(self, i, j, width_i: int, width_j: int, height_i: int, height_j: int) \
-            -> typing.List[BoolRef]:
+    def _non_overlapping_constraints_ij_linear_inequality_encoding(self, i: int, j: int, i_width: int,
+                                                                   i_height: int) -> typing.List[BoolRef]:
         constraints = list()
+        horizontal_linear_inequality_constraints = \
+            OrderEncodedVariable.linear_inequality_constraint(1, self.x_vars[i],
+                                                              -1, self.x_vars[j],
+                                                              -1 * i_width)
+        vertical_linear_inequality_constraints = \
+            OrderEncodedVariable.linear_inequality_constraint(1, self.y_vars[i],
+                                                              -1, self.y_vars[j],
+                                                              -1 * i_height)
 
-        for domain_var in range(-1, self.x_upper_bounds[i]):
-            if domain_var + width_i <= self.x_upper_bounds[j]:
-                constraints.append(
-                    Or(
-                        Not(self.lr[i][j]), self.x_vars[i].order_encoding_booleans[domain_var + 1],
-                        Not(self.x_vars[j].order_encoding_booleans[domain_var + 1 + width_i])
-                    )
-                )
-        for domain_var in range(-1, self.x_upper_bounds[j]):
-            if domain_var + width_j <= self.x_upper_bounds[i]:
-                constraints.append(
-                    Or(
-                        Not(self.lr[j][i]), self.x_vars[j].order_encoding_booleans[domain_var + 1],
-                        Not(self.x_vars[i].order_encoding_booleans[domain_var + 1 + width_j])
-                    )
-                )
+        for constraint in horizontal_linear_inequality_constraints:
+            constraints.append(simplify(Or(Not(self.lr[i][j]), constraint)))
 
-        for domain_var in range(-1, self.y_upper_bounds[i]):
-            if domain_var + height_i <= self.y_upper_bounds[j]:
-                constraints.append(
-                    Or(
-                        Not(self.ud[i][j]), self.y_vars[i].order_encoding_booleans[domain_var + 1],
-                        Not(self.y_vars[j].order_encoding_booleans[domain_var + 1 + height_i])
-                    )
-                )
-        for domain_var in range(-1, self.y_upper_bounds[j]):
-            if domain_var + height_j <= self.y_upper_bounds[i]:
-                constraints.append(
-                    Or(
-                        Not(self.ud[j][i]), self.y_vars[j].order_encoding_booleans[domain_var + 1],
-                        Not(self.y_vars[i].order_encoding_booleans[domain_var + 1 + height_j])
-                    )
-                )
+        for constraint in vertical_linear_inequality_constraints:
+            constraints.append(simplify(Or(Not(self.ud[i][j]), constraint)))
 
         return constraints
 
-
-    def _no_overlapping_constraints(self) -> typing.List[BoolRef]:
+    def _non_overlapping_constraints_linear_inequality_enconding(self) -> typing.List[BoolRef]:
         constraints = list()
-
-        for i in tqdm.tqdm(range(self.n_circuits), "Generating non overlapping constraints..."):
+        for i in tqdm.tqdm(range(self.n_circuits), "Generating non-overlapping constraints..."):
             for j in range(i + 1, self.n_circuits):
-                constraints.append(Implies(And(self.rotated[i], self.rotated[j]), And(
-                    self._no_overlapping_two_elements(i, j, self.heights[i], self.heights[j], self.widths[i], self.widths[j])
-                )))
-                constraints.append(Implies(And(self.rotated[i], Not(self.rotated[j])), And(
-                    self._no_overlapping_two_elements(i, j, self.heights[i], self.widths[j], self.widths[i], self.heights[j])
-                )))
-                constraints.append(Implies(And(Not(self.rotated[i]), self.rotated[j]), And(
-                    self._no_overlapping_two_elements(i, j, self.widths[i], self.heights[j], self.heights[i], self.widths[j])
-                )))
                 constraints.append(Implies(And(Not(self.rotated[i]), Not(self.rotated[j])), And(
-                    self._no_overlapping_two_elements(i, j, self.widths[i], self.widths[j], self.heights[i], self.heights[j])
-                )))
+                    self._non_overlapping_constraints_ij_linear_inequality_encoding(i, j, self.widths[i], self.heights[i]) +
+                    self._non_overlapping_constraints_ij_linear_inequality_encoding(j, i, self.widths[j], self.heights[j]))))
+                constraints.append(Implies(And(Not(self.rotated[i]), self.rotated[j]), And(
+                    self._non_overlapping_constraints_ij_linear_inequality_encoding(i, j, self.widths[i], self.heights[i]) +
+                    self._non_overlapping_constraints_ij_linear_inequality_encoding(j, i, self.heights[j], self.widths[j]))))
+                constraints.append(Implies(And(self.rotated[i], Not(self.rotated[j])), And(
+                    self._non_overlapping_constraints_ij_linear_inequality_encoding(i, j, self.heights[i], self.widths[i]) +
+                    self._non_overlapping_constraints_ij_linear_inequality_encoding(j, i, self.widths[j], self.heights[j]))))
+                constraints.append(Implies(And(self.rotated[i], self.rotated[j]), And(
+                    self._non_overlapping_constraints_ij_linear_inequality_encoding(i, j, self.heights[i], self.widths[i]) +
+                    self._non_overlapping_constraints_ij_linear_inequality_encoding(j, i, self.heights[j], self.widths[j]))))
                 constraints.append(Or(self.lr[i][j], self.lr[j][i], self.ud[i][j], self.ud[j][i]))
 
         return constraints
@@ -237,41 +215,30 @@ class SATStripPackingModelRotation:
         for i in range(self.n_circuits):
             for j in range(i + 1, self.n_circuits):
                 if self.widths[i] + self.widths[j] > self.board_width:
-                    constraints.append(Not(self.lr[i][j]))
-                    constraints.append(Not(self.lr[j][i]))
+                    constraints.append(Implies(And(Not(self.rotated[i]), Not(self.rotated[j])), And(Not(self.lr[i][j]), Not(self.lr[j][i]))))
+                if self.widths[i] + self.heights[j] > self.board_width:
+                    constraints.append(Implies(And(Not(self.rotated[i]), self.rotated[j]), And(Not(self.lr[i][j]), Not(self.lr[j][i]))))
+                if self.heights[i] + self.widths[j] > self.board_width:
+                    constraints.append(Implies(And(self.rotated[i], Not(self.rotated[j])), And(Not(self.lr[i][j]), Not(self.lr[j][i]))))
+                if self.heights[i] + self.heights[j] > self.board_width:
+                    constraints.append(Implies(And(self.rotated[i], self.rotated[j]), And(Not(self.lr[i][j]), Not(self.lr[j][i]))))
+
                 if self.heights[i] + self.heights[j] > self.board_height_actual_value:
-                    constraints.append(Not(self.ud[i][j]))
-                    constraints.append(Not(self.ud[j][i]))
+                    constraints.append(Implies(And(Not(self.rotated[i]), Not(self.rotated[j])), And(Not(self.ud[i][j]), Not(self.ud[j][i]))))
+                if self.heights[i] + self.widths[j] > self.board_height_actual_value:
+                    constraints.append(Implies(And(Not(self.rotated[i]), self.rotated[j]), And(Not(self.ud[i][j]), Not(self.ud[j][i]))))
+                if self.widths[i] + self.heights[j] > self.board_height_actual_value:
+                    constraints.append(Implies(And(self.rotated[i], Not(self.rotated[j])), And(Not(self.ud[i][j]), Not(self.ud[j][i]))))
+                if self.widths[i] + self.widths[j] > self.board_height_actual_value:
+                    constraints.append(Implies(And(self.rotated[i], self.rotated[j]), And(Not(self.ud[i][j]), Not(self.ud[j][i]))))
 
         return constraints
 
-    def _same_sized_circuits_symmetry_breaking_constraints(self) -> typing.List[BoolRef]:
+    def _square_circuits_fixed_rotated_state(self) -> typing.List[BoolRef]:
         constraints = list()
         for i in range(self.n_circuits):
-            for j in range(i + 1, self.n_circuits):
-                if self.widths[i] == self.widths[j] and self.heights[i] == self.heights[j]:
-                    constraints.append(Not(self.lr[j][i]))
-                    constraints.append(Or(self.lr[i][j], Not(self.ud[j][i])))
-
-        return constraints
-
-    def _domain_reduction_symmetry_breaking_constraints(self) -> typing.List[BoolRef]:
-        constraints = []
-
-        d = np.argmax(self.widths)
-        x_d_upper_bound = math.floor((self.board_width - self.widths[d]) / 2)
-        y_d_upper_bound = math.floor((self.board_height_actual_value - self.heights[d]) / 2)
-
-        for e in range(x_d_upper_bound, self.board_width - self.widths[d]):
-            constraints.append(self.x_vars[d].order_encoding_booleans[e + 1])
-        for f in range(y_d_upper_bound, self.board_height_actual_value - self.heights[d]):
-            constraints.append(self.y_vars[d].order_encoding_booleans[f + 1])
-
-        for i in range(self.n_circuits):
-            if self.widths[i] > x_d_upper_bound:
-                constraints.append(Not(self.lr[i][d]))
-            if self.heights[i] > y_d_upper_bound:
-                constraints.append(Not(self.ud[i][d]))
+            if self.widths[i] == self.heights[i]:
+                constraints.append(self.rotated[i])
 
         return constraints
 
@@ -330,10 +297,12 @@ class SATStripPackingModelRotation:
                 print("Trying to solve with board height equal to {}".format(lb))
                 s.push()
                 s.add(self._set_board_height_actual_value(lb))
-                # if self.add_implied_constraints:
-                #    s.add(self._large_circuits_constraints())
-                # if self.activate_symmetry_breaking:
-                #    s.add(self._one_pair_symmetry_breaking_constraints())
+                if self.add_implied_constraints:
+                    s.add(self._large_circuits_constraints())
+
+                if self.activate_symmetry_breaking:
+                    s.add(self._one_pair_symmetry_breaking_constraints())
+
                 evaluation = s.check()
                 if evaluation == sat:
                     print("Found solution with board height equal to {}".format(lb))
@@ -359,10 +328,11 @@ class SATStripPackingModelRotation:
                 s.push()
                 s.add(self._set_board_height_actual_value(mid))
 
-                #if self.add_implied_constraints:
-                #    s.add(self._large_circuits_constraints())
-                #if self.activate_symmetry_breaking:
-                #    s.add(self._one_pair_symmetry_breaking_constraints())
+                if self.add_implied_constraints:
+                    s.add(self._large_circuits_constraints())
+
+                if self.activate_symmetry_breaking:
+                    s.add(self._one_pair_symmetry_breaking_constraints())
 
                 evaluation = s.check()
                 if evaluation == sat:

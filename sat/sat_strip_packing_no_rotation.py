@@ -12,7 +12,7 @@ from .order_encoding import OrderEncodedVariable
 class SATStripPackingModelNoRotation:
     def __init__(self, n_circuits: int, board_width: int, widths: typing.List[int], heights: typing.List[int],
                  height_lower_bound: int, height_upper_bound: int, activate_symmetry_breaking: bool = False,
-                 add_implied_constraints: bool = False):
+                 add_implied_constraints: bool = False, use_paper_non_overlapping_constraints: bool = True):
         self.y_vars = None
         self.x_vars = None
         self.board_height_actual_value = None
@@ -25,23 +25,28 @@ class SATStripPackingModelNoRotation:
         self.height_upper_bound = height_upper_bound
         self.activate_symmetry_breaking = activate_symmetry_breaking
         self.add_implied_constraints = add_implied_constraints
+        self.use_paper_non_overlapping_constraints = use_paper_non_overlapping_constraints
         self.time_limit_ms = 300000
         print("Time limit set to: {}".format(self.time_limit_ms))
 
     @staticmethod
     def from_instance_json(json_filepath: str, activate_symmetry_breaking: bool = False,
-                           add_implied_constraints: bool = False) -> "SATStripPackingModelNoRotation":
+                           add_implied_constraints: bool = False,
+                           use_paper_non_overlapping_constraints: bool = True) -> "SATStripPackingModelNoRotation":
         with open(json_filepath, "r") as f:
             instance = json.load(f)
 
         return SATStripPackingModelNoRotation(**instance, activate_symmetry_breaking=activate_symmetry_breaking,
-                                              add_implied_constraints=add_implied_constraints)
+                                              add_implied_constraints=add_implied_constraints,
+                                              use_paper_non_overlapping_constraints=use_paper_non_overlapping_constraints)
 
     @staticmethod
     def from_dict(instance_dict: dict, activate_symmetry_breaking: bool = False,
-                  add_implied_constraints: bool = False) -> "SATStripPackingModelNoRotation":
+                  add_implied_constraints: bool = False,
+                  use_paper_non_overlapping_constraints: bool = True) -> "SATStripPackingModelNoRotation":
         return SATStripPackingModelNoRotation(**instance_dict, activate_symmetry_breaking=activate_symmetry_breaking,
-                                              add_implied_constraints=add_implied_constraints)
+                                              add_implied_constraints=add_implied_constraints,
+                                              use_paper_non_overlapping_constraints=use_paper_non_overlapping_constraints)
 
     def set_time_limit(self, time_limit: int) -> None:
         self.time_limit_ms = time_limit
@@ -77,7 +82,10 @@ class SATStripPackingModelNoRotation:
         basic_constraints += self._board_height_constraints()
 
         # 4. No overlap
-        basic_constraints += self._no_overlapping_constraints()
+        if self.use_paper_non_overlapping_constraints:
+            basic_constraints += self._non_overlapping_constraints_paper()  # faster
+        else:
+            basic_constraints += self._non_overlapping_constraints_linear_inequality_enconding()
 
         # 5. Exclusive placing relationship implied constraints
         if self.add_implied_constraints:
@@ -89,42 +97,72 @@ class SATStripPackingModelNoRotation:
 
         return basic_constraints
 
-    def _non_overlapping_horizontally_constraints(self, i: int, j: int) -> typing.List[BoolRef]:
+    def _non_overlapping_constraints_ij_linear_inequality_encoding(self, i: int, j: int) -> typing.List[BoolRef]:
         constraints = list()
+        horizontal_linear_inequality_constraints = \
+            OrderEncodedVariable.linear_inequality_constraint(1, self.x_vars[i],
+                                                              -1, self.x_vars[j],
+                                                              -1 * self.widths[i])
+        vertical_linear_inequality_constraints = \
+            OrderEncodedVariable.linear_inequality_constraint(1, self.y_vars[i],
+                                                              -1, self.y_vars[j],
+                                                              -1 * self.heights[i])
+
+        for constraint in horizontal_linear_inequality_constraints:
+            constraints.append(simplify(Or(Not(self.lr[i][j]), constraint)))
+
+        for constraint in vertical_linear_inequality_constraints:
+            constraints.append(simplify(Or(Not(self.ud[i][j]), constraint)))
+
+        return constraints
+
+    def _non_overlapping_horizontally_constraints_paper(self, i: int, j: int) -> typing.List[BoolRef]:
+        constraints = list()
+
         for domain_var in range(-1, self.board_width - self.widths[i]):
             if domain_var + self.widths[i] <= self.board_width - self.widths[j]:
                 constraints.append(
                     Or(
-                    	Not(self.lr[i][j]),
+                        Not(self.lr[i][j]),
                         self.x_vars[i].order_encoding_booleans[domain_var + 1],
                         Not(self.x_vars[j].order_encoding_booleans[domain_var + self.widths[i] + 1])
                     )
                 )
-
         return constraints
 
-    def _non_overlapping_vertically_constraints(self, i: int, j: int):
+    def _non_overlapping_vertically_constraints_paper(self, i: int, j: int) -> typing.List[BoolRef]:
         constraints = list()
+
         for domain_var in range(-1, self.height_upper_bound - self.heights[i]):
             if domain_var + self.heights[i] <= self.height_upper_bound - self.heights[j]:
                 constraints.append(
                     Or(
-                    	Not(self.ud[i][j]),
+                        Not(self.ud[i][j]),
                         self.y_vars[i].order_encoding_booleans[domain_var + 1],
                         Not(self.y_vars[j].order_encoding_booleans[domain_var + self.heights[i] + 1])
                     )
                 )
 
         return constraints
-    def _no_overlapping_constraints(self) -> typing.List[BoolRef]:
-        constraints = list()
 
-        for i in tqdm.tqdm(range(self.n_circuits), "Generating non overlapping constraints..."):
+    def _non_overlapping_constraints_linear_inequality_enconding(self) -> typing.List[BoolRef]:
+        constraints = list()
+        for i in tqdm.tqdm(range(self.n_circuits), "Generating non-overlapping constraints..."):
             for j in range(i + 1, self.n_circuits):
-                constraints += self._non_overlapping_horizontally_constraints(i, j)
-                constraints += self._non_overlapping_horizontally_constraints(j, i)
-                constraints += self._non_overlapping_vertically_constraints(i, j)
-                constraints += self._non_overlapping_vertically_constraints(j, i)
+                constraints += self._non_overlapping_constraints_ij_linear_inequality_encoding(i, j)
+                constraints += self._non_overlapping_constraints_ij_linear_inequality_encoding(j, i)
+                constraints.append(Or(self.lr[i][j], self.lr[j][i], self.ud[i][j], self.ud[j][i]))
+
+        return constraints
+
+    def _non_overlapping_constraints_paper(self):
+        constraints = list()
+        for i in tqdm.tqdm(range(self.n_circuits), "Generating non-overlapping constraints..."):
+            for j in range(i + 1, self.n_circuits):
+                constraints += self._non_overlapping_horizontally_constraints_paper(i, j)
+                constraints += self._non_overlapping_horizontally_constraints_paper(j, i)
+                constraints += self._non_overlapping_vertically_constraints_paper(i, j)
+                constraints += self._non_overlapping_vertically_constraints_paper(j, i)
                 constraints.append(Or(self.lr[i][j], self.lr[j][i], self.ud[i][j], self.ud[j][i]))
 
         return constraints
