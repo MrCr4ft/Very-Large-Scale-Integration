@@ -12,6 +12,7 @@ import click
 import numpy as np
 
 from sat.sat_strip_packing_no_rotation import SATStripPackingModelNoRotation
+from sat.sat_strip_packing_rotation import SATStripPackingModelRotation
 from milp.positioning_and_covering_models import PCMILPProblemNoRotation, PCMILPProblemRotation
 from milp.dgp_big_m_models import SGBMPulpModel, S1BMPulpModel, S2BMPulpModel
 from milp.dgp_big_m_models_with_rotation import SGBMPulpModelRotation, S1BMPulpModelRotation, \
@@ -21,6 +22,7 @@ from utils.misc import is_a_valid_solution, draw_board, solution_to_txt
 
 MODELS = {
     "SATNoRotation": SATStripPackingModelNoRotation,
+    "SATRotation": SATStripPackingModelRotation,
     "PCMILPNoRotation": PCMILPProblemNoRotation,
     "PCMILPRotation": PCMILPProblemRotation,
     "SGBM": SGBMPulpModel,
