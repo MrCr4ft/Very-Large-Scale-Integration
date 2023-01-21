@@ -6,30 +6,29 @@ import matplotlib.pyplot as plt
 import matplotlib.colors
 
 
-def read_mzn_solution(solution_filepath: str) -> typing.Dict[str, typing.Any]:
-    with open(solution_filepath, "r") as solution_file:
-        lines = list(filter(None, solution_file.read().split("\n")))
+def mzn_solution_to_dict(mzn_solution: str) -> typing.Dict[str, typing.Any]:
+    lines = list(filter(None, mzn_solution.split("\n")))
 
     board_length, board_height = tuple(map(lambda s: int(s), lines[0].split(" ")))
-    n_circuit = int(lines[1])
+    n_circuits = int(lines[1])
 
-    circuit_width, circuit_height, circuit_x, circuit_y = list(), list(), list(), list()
+    widths, heights, xs, ys = list(), list(), list(), list()
 
     for i in range(2, len(lines)):
         w, h, x, y = tuple(map(lambda s: int(s), lines[i].split(" ")))
-        circuit_width.append(w)
-        circuit_height.append(h)
-        circuit_x.append(x)
-        circuit_y.append(y)
+        widths.append(w)
+        heights.append(h)
+        xs.append(x)
+        ys.append(y)
 
     return {
-        "board_length": board_length,
+        "board_width": board_length,
         "board_height": board_height,
-        "n_circuit": n_circuit,
-        "circuit_width": circuit_width,
-        "circuit_height": circuit_height,
-        "circuit_x": circuit_x,
-        "circuit_y": circuit_y
+        "n_circuits": n_circuits,
+        "widths": widths,
+        "heights": heights,
+        "x": xs,
+        "y": ys
     }
 
 
