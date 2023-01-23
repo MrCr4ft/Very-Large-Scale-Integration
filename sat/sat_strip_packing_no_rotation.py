@@ -12,7 +12,7 @@ from .order_encoding import OrderEncodedVariable
 class SATStripPackingModelNoRotation:
     def __init__(self, n_circuits: int, board_width: int, widths: typing.List[int], heights: typing.List[int],
                  height_lower_bound: int, height_upper_bound: int, activate_symmetry_breaking: bool = False,
-                 add_implied_constraints: bool = False, use_paper_non_overlapping_constraints: bool = True):
+                 add_implied_constraints: bool = False, use_paper_non_overlapping_constraints: bool = False):
         self.y_vars = None
         self.x_vars = None
         self.board_height_actual_value = None
@@ -32,7 +32,7 @@ class SATStripPackingModelNoRotation:
     @staticmethod
     def from_instance_json(json_filepath: str, activate_symmetry_breaking: bool = False,
                            add_implied_constraints: bool = False,
-                           use_paper_non_overlapping_constraints: bool = True) -> "SATStripPackingModelNoRotation":
+                           use_paper_non_overlapping_constraints: bool = False) -> "SATStripPackingModelNoRotation":
         with open(json_filepath, "r") as f:
             instance = json.load(f)
 
@@ -43,7 +43,7 @@ class SATStripPackingModelNoRotation:
     @staticmethod
     def from_dict(instance_dict: dict, activate_symmetry_breaking: bool = False,
                   add_implied_constraints: bool = False,
-                  use_paper_non_overlapping_constraints: bool = True) -> "SATStripPackingModelNoRotation":
+                  use_paper_non_overlapping_constraints: bool = False) -> "SATStripPackingModelNoRotation":
         return SATStripPackingModelNoRotation(**instance_dict, activate_symmetry_breaking=activate_symmetry_breaking,
                                               add_implied_constraints=add_implied_constraints,
                                               use_paper_non_overlapping_constraints=use_paper_non_overlapping_constraints)
@@ -83,7 +83,7 @@ class SATStripPackingModelNoRotation:
 
         # 4. No overlap
         if self.use_paper_non_overlapping_constraints:
-            basic_constraints += self._non_overlapping_constraints_paper()  # faster
+            basic_constraints += self._non_overlapping_constraints_paper()  # faster generation
         else:
             basic_constraints += self._non_overlapping_constraints_linear_inequality_enconding()
 
