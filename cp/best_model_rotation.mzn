@@ -82,6 +82,9 @@ constraint (y[decreasing_area_order[1]] <= (FINAL_H - H[decreasing_area_order[1]
 
 % Symmetry breaking constraint: square circuits can be fixed as rotated
 constraint forall(i in CIRCUIT where W[i] = H[i]) (rotated[i]);
+
+constraint lex_lesseq(x, [L - x[i] - R_W[i] | i in CIRCUIT]);
+constraint lex_lesseq(y, [L - y[i] - R_H[i] | i in CIRCUIT]);
     
 %%% ----------------------------------------------------------- %%% 
 
