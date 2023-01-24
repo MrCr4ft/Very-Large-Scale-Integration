@@ -30,33 +30,31 @@ def iff(a: str, b: str) -> str:
 
 class SMTModel:
     def __init__(self, n_circuits: int, board_width: int, widths: typing.List[int], heights: typing.List[int],
-                 height_lower_bound: int, board_height: int, time_limit_ms: int, allow_rotation: bool = False):
+                 height_lower_bound: int, height_upper_bound: int, time_limit_ms: int, allow_rotation: bool = False):
         self.n_circuits = n_circuits
         self.board_width = board_width
-        self.board_height = board_height
         self.widths = widths
         self.heights = heights
         self.height_lower_bound = height_lower_bound
+        self.height_upper_bound = height_upper_bound
         self.time_limit_ms = time_limit_ms
         self.allow_rotation = allow_rotation
         print("Time limit set to: {}".format(self.time_limit_ms))
 
     @staticmethod
-    def from_instance_json(json_filepath: str, board_height: int, allow_rotation: bool, time_limit_ms: int) \
+    def from_instance_json(json_filepath: str, allow_rotation: bool, time_limit_ms: int) \
             -> "SMTModel":
         with open(json_filepath, "r") as f:
             instance = json.load(f)
-        instance.pop("height_upper_bound")
 
-        return SMTModel(**instance, board_height=board_height, time_limit_ms=time_limit_ms,
-                        allow_rotation=allow_rotation)
+        return SMTModel(**instance, time_limit_ms=time_limit_ms, allow_rotation=allow_rotation)
 
     def _get_smt_lib_options(self) -> str:
         return "(set-option :produce-models true)\n(set-option :timeout {})\n(set-logic QF_LIA)\n". \
             format(self.time_limit_ms)
 
     def _declare_smt_lib_variables(self) -> str:
-        variables_declaration = ""
+        variables_declaration = "(declare-fun board_height () Int)\n"
         for i in range(self.n_circuits):
             variables_declaration += "(declare-fun x{} () Int)\n(declare-fun y{} () Int)\n".format(i, i)
 
@@ -85,10 +83,12 @@ class SMTModel:
 
             if self.allow_rotation:
                 variables_domain_assertions += "(assert (<= x{} (- {} rw{})))\n".format(i, self.board_width, i)
-                variables_domain_assertions += "(assert (<= y{} (- {} rh{})))\n".format(i, self.board_height, i)
+                variables_domain_assertions += "(assert (<= y{} (- board_height rh{})))\n".format(i, i)
             else:
                 variables_domain_assertions += "(assert (<= x{} {}))\n".format(i, self.board_width - self.widths[i])
-                variables_domain_assertions += "(assert (<= y{} {}))\n".format(i, self.board_height - self.heights[i])
+                variables_domain_assertions += "(assert (<= y{} {}))\n".format(i,
+                                                                               self.height_upper_bound - self.heights[
+                                                                                   i])
 
         return variables_domain_assertions
 
@@ -121,7 +121,7 @@ class SMTModel:
                 else:
                     sum_expr += "(* {} {}) ".format(bool_to_int_expr, self.heights[i])
             sum_expr += ")"
-            constraints += "(assert (<= {} {}))\n".format(sum_expr, self.board_height)
+            constraints += "(assert (<= {} board_height))\n".format(sum_expr)
 
         return constraints
 
@@ -147,69 +147,28 @@ class SMTModel:
 
         return constraints
 
-    def _large_circuits_pair(self):
+    def _large_circuits_pair_no_rot(self):
         constraints = ""
         for i in range(self.n_circuits):
             for j in range(i + 1, self.n_circuits):
                 if self.widths[i] + self.widths[j] > self.board_width:
-                    if self.allow_rotation:
-                        # not rot(i) not rot(j), focus on width
-                        constraints += "(assert (=> (and (not r{i}) (not r{j})) " \
-                                       "(or (<= (+ y{i} {height_i}) y{j}) (>= y{i} (+ y{j} {height_j})))))\n". \
-                            format(i=i, j=j, height_i=self.heights[i], height_j=self.heights[j])
-                    else:
-                        constraints += "(assert (or (<= (+ y{i} {height_i}) y{j}) (>= y{i} (+ y{j} {height_j}))))\n". \
-                            format(i=i, j=j, height_i=self.heights[i], height_j=self.heights[j])
-                if self.heights[i] + self.heights[j] > self.board_height:
-                    if self.allow_rotation:
-                        # not rot(i) not rot(j), focus on height
-                        constraints += "(assert (=> (and (not r{i}) (not r{j})) " \
-                                       "(or (<= (+ x{i} {width_i}) x{j}) (>= x{i} (+ x{j} {width_j})))))\n". \
-                            format(i=i, j=j, width_i=self.widths[i], width_j=self.widths[j])
-                    else:
-                        constraints += "(assert (or (<= (+ x{i} {width_i}) x{j}) (>= x{i} (+ x{j} {width_j}))))\n". \
-                            format(i=i, j=j, width_i=self.widths[i], width_j=self.widths[j])
-                if self.allow_rotation and self.widths[i] + self.heights[j] > self.board_width:
-                    # rot(i) not rot(j), focus on width
-                    constraints += "(assert (=> (and r{i} (not r{j})) " \
-                                   "(or (<= (+ y{i} {width_i}) y{j}) (>= y{i} (+ y{j} {height_j})))))\n". \
-                        format(i=i, j=j, width_i=self.widths[i], height_j=self.heights[j])
-                if self.allow_rotation and self.heights[i] + self.widths[j] > self.board_width:
-                    # not rot(i) rot(j), focus on width
-                    constraints += "(assert (=> (and (not r{i}) r{j}) " \
-                                   "(or (<= (+ y{i} {height_i}) y{j}) (>= y{i} (+ y{j} {width_j})))))\n". \
-                        format(i=i, j=j, height_i=self.heights[i], width_j=self.widths[j])
-                if self.allow_rotation and self.widths[i] + self.heights[j] > self.board_height:
-                    # rot(i) not rot(j), focus on height
-                    constraints += "(assert (=> (and r{i} (not r{j})) " \
-                                   "(or (<= (+ x{i} {height_i}) x{j}) (>= x{i} (+ x{j} {width_j})))))\n". \
-                        format(i=i, j=j, height_i=self.heights[i], width_j=self.widths[j])
-                if self.allow_rotation and self.heights[i] + self.widths[j] > self.board_height:
-                    # not rot(i) rot(j), focus on height
-                    constraints += "(assert (=> (and (not r{i}) r{j}) " \
-                                   "(or (<= (+ x{i} {width_i}) x{j}) (>= x{i} (+ x{j} {height_j})))))\n". \
-                        format(i=i, j=j, width_i=self.widths[i], height_j=self.heights[j])
-                if self.allow_rotation and self.widths[i] + self.widths[j] > self.board_height:
-                    # rot(i) rot(j), focus on width
-                    constraints += "(assert (=> (and r{i} r{j}) " \
-                                   "(or (<= (+ x{i} {height_i}) x{j}) (>= x{i} (+ x{j} {height_j})))))\n". \
+                    constraints += "(assert (or (<= (+ y{i} {height_i}) y{j}) (>= y{i} (+ y{j} {height_j}))))\n". \
                         format(i=i, j=j, height_i=self.heights[i], height_j=self.heights[j])
-                if self.allow_rotation and self.heights[i] + self.heights[j] > self.board_width:
-                    # rot(i) rot(j), focus on height
-                    constraints += "(assert (=> (and r{i} r{j}) " \
-                                   "(or (<= (+ y{i} {width_i}) y{j}) (>= y{i} (+ y{j} {width_j})))))\n". \
-                        format(i=i, j=j, width_i=self.widths[i], width_j=self.widths[j])
-
+                if self.heights[i] + self.heights[j] > self.height_upper_bound:
+                    constraints += "(assert (=> (>= {cumulative_height} board_height) " \
+                                   "(or (<= (+ x{i} {width_i}) x{j}) (>= x{i} (+ x{j} {width_j})))))\n".\
+                        format(cumulative_height=self.heights[i] + self.heights[j], i=i, j=j, width_i=self.widths[i],
+                               width_j=self.widths[j])
         return constraints
 
     def lexicographic_ordering_symmetry_breaking(self):
         constraints = ""
         for i in range(self.n_circuits):
             if not self.allow_rotation:
-                reflected_x_positions = ["(- {} {} {})".format(self.board_width, self.widths[i], "x{}".format(i)) for i
+                reflected_x_positions = ["(- {} {} x{})".format(self.board_width, self.widths[i], i) for i
                                          in
                                          range(self.n_circuits)]
-                reflected_y_positions = ["(- {} {} {})".format(self.board_height, self.heights[i], "y{}".format(i))
+                reflected_y_positions = ["(- board_height {} y{})".format(self.heights[i], i)
                                          for i in range(self.n_circuits)]
                 constraints += lexicographic_ordering_ror("aux_lex_x_{}_".format(i),
                                                           ["x{}".format(i) for i in range(self.n_circuits)],
@@ -218,9 +177,9 @@ class SMTModel:
                                                           ["y{}".format(i) for i in range(self.n_circuits)],
                                                           reflected_y_positions)
             else:
-                reflected_x_positions = ["(- {} rw{} {})".format(self.board_width, i, "x{}".format(i)) for i
+                reflected_x_positions = ["(- {} rw{} x{})".format(self.board_width, i, i) for i
                                          in range(self.n_circuits)]
-                reflected_y_positions = ["(- {} rh{} {})".format(self.board_height, i, "y{}".format(i))
+                reflected_y_positions = ["(- board_height rh{} y{})".format(i, i)
                                          for i in range(self.n_circuits)]
                 constraints += lexicographic_ordering_ror("aux_lex_x_{}_".format(i),
                                                           ["x{}".format(i) for i in range(self.n_circuits)],
@@ -229,6 +188,15 @@ class SMTModel:
                                                           ["y{}".format(i) for i in range(self.n_circuits)],
                                                           reflected_y_positions)
 
+        return constraints
+
+    def _enforce_actual_board_height(self):
+        constraints = ""
+        for i in range(self.n_circuits):
+            if not self.allow_rotation:
+                constraints += "(assert (<= (+ y{} {}) board_height))\n".format(i, self.heights[i])
+            else:
+                constraints += "(assert (<= (+ y{} rh{}) board_height))\n".format(i, i)
         return constraints
 
     def one_pair_of_circuits_symmetry_breaking(self):
@@ -245,6 +213,8 @@ class SMTModel:
         smt_lib_instance = self._get_smt_lib_options() + "\n" + self._declare_smt_lib_variables() + "\n" + \
                            self._impose_variables_domain() + "\n"
 
+        smt_lib_instance += self._enforce_actual_board_height()
+
         if self.allow_rotation:
             smt_lib_instance += self._enforce_rotation() + "\n"
 
@@ -252,7 +222,8 @@ class SMTModel:
             for j in range(i + 1, self.n_circuits):
                 smt_lib_instance += self._non_overlapping_constraint(i, j)
 
-        smt_lib_instance += self._large_circuits_pair()
+        if not self.allow_rotation:
+            smt_lib_instance += self._large_circuits_pair_no_rot()
 
         if turn_on_cumulative_constraints:
             smt_lib_instance += self.cumulative_constraints_x()
@@ -262,6 +233,7 @@ class SMTModel:
             smt_lib_instance += self.lexicographic_ordering_symmetry_breaking()
             smt_lib_instance += self.one_pair_of_circuits_symmetry_breaking()
 
+        smt_lib_instance += "(assert (<= board_height {}))\n".format(self.height_upper_bound)
         smt_lib_instance += "(check-sat)\n"
 
         return smt_lib_instance
