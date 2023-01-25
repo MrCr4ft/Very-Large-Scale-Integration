@@ -46,14 +46,15 @@ constraint cumulative(x, W, H, FINAL_H);
 
 % This redundant constraint imposes that each rectangle must occur (both in the horizontal and vertical position) either
 % at the beginning of a row (column) or immediately next to another rectangle.
-constraint (
+% Turned off because it slows down the search
+/*constraint (
   forall(i in CIRCUIT) (
     member([0] ++ [x[j] + W[j] | j in CIRCUIT where j != i], x[i])
     /\
     member([0] ++ [y[j] + H[j] | j in CIRCUIT where j != i], y[i]))
 );
+*/
 
-/*
 constraint (forall(i in CIRCUIT) (
   forall(j in CIRCUIT where j > i) (
     if W[i] + W[j] > L then (y[i] + H[i] <= y[j] \/ y[i] >= y[j] + H[j]) endif)));
@@ -61,15 +62,16 @@ constraint (forall(i in CIRCUIT) (
 constraint (forall(i in CIRCUIT) (
   forall(j in CIRCUIT where j > i) (
     if H[i] + H[j] > FINAL_H then (x[i] + W[i] <= x[j] \/ x[i] >= x[j] + W[j]) endif)));
-*/
+
 
 % One can choose between this constraint or the following. Even though the following prunes more the solution space,
 % according to my experiments, imposing this one does on average result in a faster resolution.
 % For this reason the following is commented out.
 
+
 % Symmetry breaking constraint that imposes an ordering between the two biggest rectangle.
 % The biggest rectangle is placed on the bottom-left area of the board wrt the second biggest one.
-constraint
+/*constraint
   let {
     int: o1 = decreasing_area_order[1],
     int: o2 = decreasing_area_order[2]
@@ -79,13 +81,13 @@ constraint
     [y[o1],x[o1]],
     [y[o2],x[o2]]
 );
-
+*/
 
 % Symmetry breaking and domain reduction constraint: places the biggest rectangle in the lower half of the board
-/*
+
 constraint (x[decreasing_area_order[1]] <= (L - W[decreasing_area_order[1]]) div 2);
 constraint (y[decreasing_area_order[1]] <= (FINAL_H - H[decreasing_area_order[1]]) div 2);
-*/
+
 
 % Symmetry breaking constraint that imposes an ordering between rectangles of the same size.
 constraint forall(i in CIRCUIT) (
@@ -103,8 +105,9 @@ constraint forall(i in CIRCUIT) (
 );
 
 % Symmetry breaking constraint. Impose lexicographic ordering to circuit position and reflected one.
-constraint lex_lesseq(x, [L - x[i] - W[i] | i in CIRCUIT]);
-constraint lex_lesseq(y, [L - y[i] - H[i] | i in CIRCUIT]);
+% Even though this constraint prunes much the solution space, it slows down the search, probably because it is quite heavy.
+%constraint lex_lesseq(x, [L - x[i] - W[i] | i in CIRCUIT]);
+%constraint lex_lesseq(y, [FINAL_H - y[i] - H[i] | i in CIRCUIT]);
 
 %%% ----------------------------------------------------------- %%%
 
