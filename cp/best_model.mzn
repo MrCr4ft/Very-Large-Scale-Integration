@@ -53,6 +53,14 @@ constraint (
     member([0] ++ [y[j] + H[j] | j in CIRCUIT where j != i], y[i]))
 );
 
+constraint (forall(i in CIRCUIT) (
+  forall(j in CIRCUIT where j > i) (
+    if W[i] + W[j] > L then (y[i] + H[i] <= y[j] \/ y[i] >= y[j] + H[j]) endif)));
+
+constraint (forall(i in CIRCUIT) (
+  forall(j in CIRCUIT where j > i) (
+    if H[i] + H[j] > FINAL_H then (x[i] + W[i] <= x[j] \/ x[i] >= x[j] + W[j]) endif)));
+
 % One can choose between this constraint or the following. Even though the following prunes more the solution space,
 % according to my experiments, imposing this one does on average result in a faster resolution.
 % For this reason the following is commented out.
@@ -92,6 +100,9 @@ constraint forall(i in CIRCUIT) (
     endif
 );
 
+% Symmetry breaking constraint. Impose lexicographic ordering to circuit position and reflected one.
+constraint lex_lesseq(x, [L - x[i] - W[i] | i in CIRCUIT]);
+constraint lex_lesseq(y, [L - y[i] - H[i] | i in CIRCUIT]);
 
 %%% ----------------------------------------------------------- %%%
 

@@ -1,5 +1,5 @@
 # example of usage:
-# python ./solve_instances_sat_milp.py --instances-input-dir="./instances/json"
+# python ./solve_instances_sat_milp_smt.py --instances-input-dir="./instances/json"
 # --solutions-output-dir="./solutions/milp/sg_with_rotation"
 # --stats-output-csv-file="./solutions/milp/sg_with_rotation/stats.csv" --timeout-ms=300000 --model-name=SGBMRotation
 
@@ -17,6 +17,7 @@ from milp.positioning_and_covering_models import PCMILPProblemNoRotation, PCMILP
 from milp.dgp_big_m_models import SGBMPulpModel, S1BMPulpModel, S2BMPulpModel
 from milp.dgp_big_m_models_with_rotation import SGBMPulpModelRotation, S1BMPulpModelRotation, \
     S2BMPulpModelRotation
+from smt.model import SMTModel
 from utils.misc import is_a_valid_solution, draw_board, solution_to_txt
 
 
@@ -30,7 +31,8 @@ MODELS = {
     "S2BM": S2BMPulpModel,
     "SGBMRotation": SGBMPulpModelRotation,
     "S1BMRotation": S1BMPulpModelRotation,
-    "S2BMRotation": S2BMPulpModelRotation
+    "S2BMRotation": S2BMPulpModelRotation,
+    "SMT": SMTModel,
 }
 CSV_FIELD_NAMES = ["instance", "optimally_solved", "board_height", "elapsed_ms"]
 
@@ -57,10 +59,14 @@ class NpEncoder(json.JSONEncoder):
 @click.option('--presolve-for-milp', type=bool, required=False, default=True)
 @click.option('--solver-for-milp', type=str, required=False, default=None)
 @click.option('--perform-linear-search', type=bool, required=False, default=False)
+@click.option('--solver-for-smt', type=str, required=False, default="z3")
+@click.option('--enable-cumulative-constraints-smt', type=bool, required=False, default=True)
+@click.option('--allow-rotation-smt', type=bool, required=False, default=False)
 @click.option('--draw-solutions', type=bool, required=False, default=True)
 def run(model_name: str, instances_input_dir: str, solutions_output_dir: str, stats_output_csv_file: str,
         json_solutions: bool = False, timeout_ms: int = 300, activate_symmetry_breaking: bool = True,
         presolve_for_milp: bool = True, solver_for_milp: str = None, perform_linear_search: bool = False,
+        solver_for_smt: str = "z3", enable_cumulative_constraints_smt: bool = True, allow_rotation_smt: bool = False,
         draw_solutions: bool = True):
 
     if model_name not in MODELS:
@@ -81,11 +87,15 @@ def run(model_name: str, instances_input_dir: str, solutions_output_dir: str, st
             instance = chosen_model.from_instance_json(current_instance_filepath,
                                                        activate_symmetry_breaking=activate_symmetry_breaking,
                                                        add_implied_constraints=True,
-                                                       presolve=presolve_for_milp,)
+                                                       presolve=presolve_for_milp, time_limit_ms=timeout_ms,
+                                                       allow_rotation=allow_rotation_smt)
             instance.set_time_limit(timeout_ms)
             if solver_for_milp is not None:
                 instance.set_solver(solver_for_milp)
-            solution, elapsed_ms, optimal_solution = instance.solve(linear_search=perform_linear_search)
+            solution, elapsed_ms, optimal_solution = \
+                instance.solve(linear_search=perform_linear_search, solver=solver_for_smt,
+                               turn_on_cumulative_constraints=enable_cumulative_constraints_smt,
+                               turn_on_symmetry_breaking=activate_symmetry_breaking)
 
             if solution is not None:
                 if not is_a_valid_solution(**solution):
