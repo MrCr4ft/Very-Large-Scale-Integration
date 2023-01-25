@@ -63,6 +63,8 @@ def draw_board(board_width: int, board_height: int, n_circuits: int, widths: typ
     if display_solution:
         plt.show()
 
+    plt.close()
+
 
 def to_dzn_input(board_width: int, board_height: int, n_circuits: int, widths: typing.List[int],
                  heights: typing.List[int], x: typing.List[int], y: typing.List[int]):
