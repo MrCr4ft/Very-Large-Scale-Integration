@@ -1,0 +1,1 @@
+{"n_circuits": 21, "board_width": 27, "widths": [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4], "heights": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 19, 20, 21, 3, 4, 6, 7, 8, 14, 19, 20], "height_lower_bound": 27, "height_upper_bound": 36}

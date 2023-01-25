@@ -1,0 +1,8 @@
+{
+	"length": "L",
+	"n_circuits": "N",
+	"width": "W",
+	"height": "H",
+	"height_lower_bound": "H_LB",
+	"height_upper_bound": "H_UB"
+}
