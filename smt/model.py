@@ -1,5 +1,27 @@
+import time
 import typing
 import json
+import subprocess
+
+
+def spawn_z3():
+    return subprocess.Popen(
+        "z3 -in",
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=True
+    )
+
+
+def spawn_cvc5():
+    return subprocess.Popen(
+        "cvc5",
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=True
+    )
 
 
 def lexicographic_ordering_ror(aux_vars_prefix: str, vector_a: typing.List[str], vector_b: typing.List[str]) -> str:
@@ -28,6 +50,13 @@ def iff(a: str, b: str) -> str:
     return "(and (=> {} {}) (=> {} {}))".format(a, b, b, a)
 
 
+def retrieve_value(solver: subprocess.Popen, var_name: str) -> int:
+    solver.stdin.write("(get-value ({}))\n".format(var_name).encode("utf-8"))
+    solver.stdin.flush()
+    result = solver.stdout.readline().decode("utf-8")
+    return int(result.split(" ")[-1].replace(")", ""))
+
+
 class SMTModel:
     def __init__(self, n_circuits: int, board_width: int, widths: typing.List[int], heights: typing.List[int],
                  height_lower_bound: int, height_upper_bound: int, time_limit_ms: int, allow_rotation: bool = False):
@@ -42,7 +71,8 @@ class SMTModel:
         print("Time limit set to: {}".format(self.time_limit_ms))
 
     @staticmethod
-    def from_instance_json(json_filepath: str, allow_rotation: bool, time_limit_ms: int) \
+    def from_instance_json(json_filepath: str, allow_rotation: bool, time_limit_ms: int,
+                           *args, **kwargs) \
             -> "SMTModel":
         with open(json_filepath, "r") as f:
             instance = json.load(f)
@@ -50,8 +80,11 @@ class SMTModel:
         return SMTModel(**instance, time_limit_ms=time_limit_ms, allow_rotation=allow_rotation)
 
     def _get_smt_lib_options(self) -> str:
-        return "(set-option :produce-models true)\n(set-option :timeout {})\n(set-logic QF_LIA)\n". \
+        return "(set-option :produce-models true)\n(set-logic QF_LIA)\n". \
             format(self.time_limit_ms)
+
+    def set_time_limit(self, time_limit_ms: int):
+        self.time_limit_ms = time_limit_ms
 
     def _declare_smt_lib_variables(self) -> str:
         variables_declaration = "(declare-fun board_height () Int)\n"
@@ -128,7 +161,7 @@ class SMTModel:
     def cumulative_constraints_y(self):
         constraints = ""
         early = 0
-        late = self.board_height + max(self.heights)
+        late = self.height_upper_bound + max(self.heights)
         for t in range(early, late + 1):
             sum_expr = "(+ "
             for i in range(self.n_circuits):
@@ -233,7 +266,81 @@ class SMTModel:
             smt_lib_instance += self.lexicographic_ordering_symmetry_breaking()
             smt_lib_instance += self.one_pair_of_circuits_symmetry_breaking()
 
-        smt_lib_instance += "(assert (<= board_height {}))\n".format(self.height_upper_bound)
-        smt_lib_instance += "(check-sat)\n"
-
         return smt_lib_instance
+
+    def retrieve_solution(self, solver: subprocess.Popen) -> typing.Dict[str, typing.Any]:
+        xs = []
+        ys = []
+        ws = []
+        hs = []
+        for i in range(self.n_circuits):
+            x = retrieve_value(solver, "x{}".format(i))
+            xs.append(x)
+            y = retrieve_value(solver, "y{}".format(i))
+            ys.append(y)
+            if self.allow_rotation:
+                w = retrieve_value(solver, "rw{}".format(i))
+                h = retrieve_value(solver, "rh{}".format(i))
+                ws.append(w)
+                hs.append(h)
+        board_height = retrieve_value(solver, "board_height")
+
+        return {
+            'board_width': self.board_width,
+            'board_height': board_height,
+            'n_circuits': self.n_circuits,
+            'widths': ws if self.allow_rotation else self.widths,
+            'heights': hs if self.allow_rotation else self.heights,
+            'x': xs,
+            'y': ys
+        }
+
+    def solve(self, turn_on_cumulative_constraints: bool = False, turn_on_symmetry_breaking: bool = True,
+              solver: str = "z3", *args, **kwargs):
+        smt_lib_model = self.to_smt_lib_format(turn_on_cumulative_constraints, turn_on_symmetry_breaking)
+        if solver == "z3":
+            solver = spawn_z3()
+        elif solver == "cvc5":
+            solver = spawn_cvc5()
+        else:
+            raise ValueError("Solver: {} not configured!".format(solver))
+        solver.stdin.write(smt_lib_model.encode("utf-8"))
+
+        # binary searchf
+        lb = self.height_lower_bound
+        ub = self.height_upper_bound
+        current_time_limit = self.time_limit_ms
+        solution = None
+        while lb <= ub:
+            mid = (lb + ub) // 2
+            print("Trying to solve with height equal to ", mid)
+            start_time = time.perf_counter()
+            solver.stdin.write("(push)".format(current_time_limit).encode("utf-8"))
+            solver.stdin.write("(set-option :timeout {})".format(self.time_limit_ms).encode("utf-8"))
+            solver.stdin.write("(assert (<= board_height {}))\n".format(mid).encode("utf-8"))
+            solver.stdin.write("(check-sat)\n".encode("utf-8"))
+            solver.stdin.flush()
+            solver_output = solver.stdout.readline().decode("utf-8").strip()
+            end_time = time.perf_counter()
+            elapsed_time = end_time - start_time
+            current_time_limit -= int(elapsed_time * 1000)
+            if current_time_limit <= 0:
+                print("Time limit exceeded")
+                if solution is not None:
+                    return solution, self.time_limit_ms, False
+                else:
+                    solver.terminate()
+                    return None, self.time_limit_ms, False
+            if solver_output == "sat":
+                ub = mid - 1
+                print("Solution found with height equal to {}!".format(mid))
+                solution = self.retrieve_solution(solver)
+            elif solver_output == "unsat":
+                lb = mid + 1
+                print("Unsat with height equal to {}!".format(mid))
+                solver.stdin.write("(pop)".format(current_time_limit).encode("utf-8"))
+            else:
+                raise Exception("Unknown solver output: {}. Exiting...".format(solver_output))
+
+        solver.terminate()
+        return solution, self.time_limit_ms - current_time_limit, True
