@@ -32,7 +32,8 @@ class SATStripPackingModelNoRotation:
     @staticmethod
     def from_instance_json(json_filepath: str, activate_symmetry_breaking: bool = False,
                            add_implied_constraints: bool = False,
-                           use_paper_non_overlapping_constraints: bool = False) -> "SATStripPackingModelNoRotation":
+                           use_paper_non_overlapping_constraints: bool = False,
+                           *args, **kwargs) -> "SATStripPackingModelNoRotation":
         with open(json_filepath, "r") as f:
             instance = json.load(f)
 
@@ -43,7 +44,8 @@ class SATStripPackingModelNoRotation:
     @staticmethod
     def from_dict(instance_dict: dict, activate_symmetry_breaking: bool = False,
                   add_implied_constraints: bool = False,
-                  use_paper_non_overlapping_constraints: bool = False) -> "SATStripPackingModelNoRotation":
+                  use_paper_non_overlapping_constraints: bool = False,
+                  *args, **kwargs) -> "SATStripPackingModelNoRotation":
         return SATStripPackingModelNoRotation(**instance_dict, activate_symmetry_breaking=activate_symmetry_breaking,
                                               add_implied_constraints=add_implied_constraints,
                                               use_paper_non_overlapping_constraints=use_paper_non_overlapping_constraints)
@@ -256,7 +258,8 @@ class SATStripPackingModelNoRotation:
             'y': ys
         }
 
-    def solve(self, linear_search: bool = True) -> typing.Tuple[typing.Dict[str, typing.Any], int, bool]:
+    def solve(self, linear_search: bool = True, *args, **kwargs) \
+            -> typing.Tuple[typing.Dict[str, typing.Any], int, bool]:
         self._init_z3_variables()
         s = Solver()
         s.set("timeout", self.time_limit_ms)
