@@ -14,9 +14,9 @@ def spawn_z3():
     )
 
 
-def spawn_cvc5():
+def spawn_cvc5(timeout_ms: int):
     return subprocess.Popen(
-        "cvc5",
+        "cvc5 --incremental --lang=smt2 --tlimit={}".format(timeout_ms),
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -299,12 +299,12 @@ class SMTModel:
               solver: str = "z3", *args, **kwargs):
         smt_lib_model = self.to_smt_lib_format(turn_on_cumulative_constraints, turn_on_symmetry_breaking)
         if solver == "z3":
-            solver = spawn_z3()
+            solver_instance = spawn_z3()
         elif solver == "cvc5":
-            solver = spawn_cvc5()
+            solver_instance = spawn_cvc5(self.time_limit_ms)
         else:
             raise ValueError("Solver: {} not configured!".format(solver))
-        solver.stdin.write(smt_lib_model.encode("utf-8"))
+        solver_instance.stdin.write(smt_lib_model.encode("utf-8"))
 
         # binary searchf
         lb = self.height_lower_bound
@@ -315,32 +315,33 @@ class SMTModel:
             mid = (lb + ub) // 2
             print("Trying to solve with height equal to ", mid)
             start_time = time.perf_counter()
-            solver.stdin.write("(push)".format(current_time_limit).encode("utf-8"))
-            solver.stdin.write("(set-option :timeout {})".format(self.time_limit_ms).encode("utf-8"))
-            solver.stdin.write("(assert (<= board_height {}))\n".format(mid).encode("utf-8"))
-            solver.stdin.write("(check-sat)\n".encode("utf-8"))
-            solver.stdin.flush()
-            solver_output = solver.stdout.readline().decode("utf-8").strip()
+            solver_instance.stdin.write("(push)".format(current_time_limit).encode("utf-8"))
+            if solver == "z3":
+                solver_instance.stdin.write("(set-option :timeout {})".format(self.time_limit_ms).encode("utf-8"))
+            solver_instance.stdin.write("(assert (<= board_height {}))\n".format(mid).encode("utf-8"))
+            solver_instance.stdin.write("(check-sat)\n".encode("utf-8"))
+            solver_instance.stdin.flush()
+            solver_output = solver_instance.stdout.readline().decode("utf-8").strip()
             end_time = time.perf_counter()
             elapsed_time = end_time - start_time
             current_time_limit -= int(elapsed_time * 1000)
-            if current_time_limit <= 0:
+            if current_time_limit <= 0 or solver_instance.poll() is not None:
                 print("Time limit exceeded")
                 if solution is not None:
                     return solution, self.time_limit_ms, False
                 else:
-                    solver.terminate()
+                    solver_instance.terminate()
                     return None, self.time_limit_ms, False
             if solver_output == "sat":
                 ub = mid - 1
                 print("Solution found with height equal to {}!".format(mid))
-                solution = self.retrieve_solution(solver)
+                solution = self.retrieve_solution(solver_instance)
             elif solver_output == "unsat":
                 lb = mid + 1
                 print("Unsat with height equal to {}!".format(mid))
-                solver.stdin.write("(pop)".format(current_time_limit).encode("utf-8"))
+                solver_instance.stdin.write("(pop)".format(current_time_limit).encode("utf-8"))
             else:
                 raise Exception("Unknown solver output: {}. Exiting...".format(solver_output))
 
-        solver.terminate()
+        solver_instance.terminate()
         return solution, self.time_limit_ms - current_time_limit, True
