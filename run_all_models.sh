@@ -19,37 +19,51 @@ mkdir -p $SOLUTIONS_DIR
 
 #CP with Chuffed
 
-#Best model without rotation
-#python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/best_model.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_best_model/chuffed/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_best_model/chuffed/stats.csv" --solver="chuffed" --timeout-ms=$TIME_LIMIT --draw-solutions=True
-#Best model with rotation
-python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/best_model_rotation.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_best_model_rotation/chuffed/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_best_model_rotation/chuffed/stats.csv" --solver="chuffed" --timeout-ms=$TIME_LIMIT --draw-solutions=True
+#Best model without rotation with symmetry breaking 1
+python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/best_model_sb_1.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_best_model_sb_1/chuffed/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_best_model_sb_1/chuffed/stats.csv" --solver="chuffed" --timeout-ms=$TIME_LIMIT --draw-solutions=True
+#Best model with rotation with symmetry breaking 1
+python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/best_model_rotation_sb_1.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_best_model_rotation_sb_1/chuffed/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_best_model_rotation_sb_1/chuffed/stats.csv" --solver="chuffed" --timeout-ms=$TIME_LIMIT --draw-solutions=True
+
+
+#Best model without rotation with symmetry breaking 2
+python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/best_model_sb_2.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_best_model_sb_2/chuffed/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_best_model_sb_2/chuffed/stats.csv" --solver="chuffed" --timeout-ms=$TIME_LIMIT --draw-solutions=True
+#Best model with rotation with symmetry breaking 2
+python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/best_model_rotation_sb_2.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_best_model_rotation_sb_2/chuffed/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_best_model_rotation_sb_2/chuffed/stats.csv" --solver="chuffed" --timeout-ms=$TIME_LIMIT --draw-solutions=True
+
+
+#Best model without rotation without symmetry breaking
+python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/best_model_no_sb.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_best_model_no_sb/chuffed/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_best_model_no_sb/chuffed/stats.csv" --solver="chuffed" --timeout-ms=$TIME_LIMIT --draw-solutions=True
+#Best model with rotation without symmetry breaking
+python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/best_model_rotation_no_sb.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_best_model_rotation_no_sb/chuffed/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_best_model_rotation_no_sb/chuffed/stats.csv" --solver="chuffed" --timeout-ms=$TIME_LIMIT --draw-solutions=True
 
 #Board channeling without rotation
 python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/board_channeling.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_board_channeling/chuffed/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_board_channeling/chuffed/stats.csv" --solver="chuffed" --timeout-ms=$TIME_LIMIT --draw-solutions=False
 #Board channeling with rotation
 python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/board_channeling_rotation.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_board_channeling_rotation/chuffed/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_board_channeling_rotation/chuffed/stats.csv" --solver="chuffed" --timeout-ms=$TIME_LIMIT --draw-solutions=False
 
-# SAT based method for 2DSP without rotation
-python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/sat_based_method_for_2dsp.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_sat_based_method_for_2dsp/chuffed/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_sat_based_method_for_2dsp/chuffed/stats.csv" --solver="chuffed" --timeout-ms=$TIME_LIMIT --draw-solutions=False
-# SAT based method for 2DSP with rotation
-python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/sat_based_method_for_2dsp_rotation.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_sat_based_method_for_2dsp_rotation/chuffed/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_sat_based_method_for_2dsp_rotation/chuffed/stats.csv" --solver="chuffed" --timeout-ms=$TIME_LIMIT --draw-solutions=False
-
 #CP with Gecode
 
-#Best model without rotation
-python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/best_model.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_best_model/gecode/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_best_model/gecode/stats.csv" --solver="gecode" --timeout-ms=$TIME_LIMIT --draw-solutions=False
-#Best model with rotation
-python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/best_model_rotation.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_best_model_rotation/gecode/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_best_model_rotation/gecode/stats.csv" --solver="gecode" --timeout-ms=$TIME_LIMIT --draw-solutions=False
+#Best model without rotation with symmetry breaking 1
+python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/best_model_sb_1.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_best_model_sb_1/gecode/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_best_model_sb_1/gecode/stats.csv" --solver="gecode" --timeout-ms=$TIME_LIMIT --draw-solutions=True
+#Best model with rotation with symmetry breaking 1
+python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/best_model_rotation_sb_1.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_best_model_rotation_sb_1/gecode/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_best_model_rotation_sb_1/gecode/stats.csv" --solver="gecode" --timeout-ms=$TIME_LIMIT --draw-solutions=True
+
+
+#Best model without rotation with symmetry breaking 2
+python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/best_model_sb_2.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_best_model_sb_2/gecode/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_best_model_sb_2/gecode/stats.csv" --solver="gecode" --timeout-ms=$TIME_LIMIT --draw-solutions=True
+#Best model with rotation with symmetry breaking 2
+python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/best_model_rotation_sb_2.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_best_model_rotation_sb_2/gecode/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_best_model_rotation_sb_2/gecode/stats.csv" --solver="gecode" --timeout-ms=$TIME_LIMIT --draw-solutions=True
+
+
+#Best model without rotation without symmetry breaking
+python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/best_model_no_sb.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_best_model_no_sb/gecode/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_best_model_no_sb/gecode/stats.csv" --solver="gecode" --timeout-ms=$TIME_LIMIT --draw-solutions=True
+#Best model with rotation without symmetry breaking
+python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/best_model_rotation_no_sb.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_best_model_rotation_no_sb/gecode/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_best_model_rotation_no_sb/gecode/stats.csv" --solver="gecode" --timeout-ms=$TIME_LIMIT --draw-solutions=True
 
 #Board channeling without rotation
 python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/board_channeling.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_board_channeling/gecode/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_board_channeling/gecode/stats.csv" --solver="gecode" --timeout-ms=$TIME_LIMIT --draw-solutions=False
 #Board channeling with rotation
 python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/board_channeling_rotation.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_board_channeling_rotation/gecode/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_board_channeling_rotation/gecode/stats.csv" --solver="gecode" --timeout-ms=$TIME_LIMIT --draw-solutions=False
-
-# SAT based method for 2DSP without rotation
-python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/sat_based_method_for_2dsp.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_sat_based_method_for_2dsp/gecode/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_sat_based_method_for_2dsp/gecode/stats.csv" --solver="gecode" --timeout-ms=$TIME_LIMIT --draw-solutions=False
-# SAT based method for 2DSP with rotation
-python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/sat_based_method_for_2dsp_rotation.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_sat_based_method_for_2dsp_rotation/gecode/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_sat_based_method_for_2dsp_rotation/gecode/stats.csv" --solver="gecode" --timeout-ms=$TIME_LIMIT --draw-solutions=False
 
 # MILP models with GUROBI
 #SGBMRotationGUROBI
