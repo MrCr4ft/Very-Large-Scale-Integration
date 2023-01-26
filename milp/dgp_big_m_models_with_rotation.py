@@ -50,15 +50,15 @@ class SPulpModelRotation(ABC):
     def from_dict(instance_dict: dict, use_warm_start: bool) -> "SPulpModelRotation":
         pass
 
-    def set_time_limit(self, time_limit_ms: int) -> None:
+    def set_time_limit(self, time_limit_ms: float) -> None:
         self.time_limit_ms = time_limit_ms
-        self.solver = SOLVERS[self.solver_name](self.time_limit_ms)
+        self.solver = SOLVERS[self.solver_name](self.time_limit_ms / 1000)
         print("Time limit set to {}".format(time_limit_ms))
 
     def set_solver(self, solver_name: str):
         if solver_name not in SOLVERS:
             raise ValueError("Solver %s not supported." % solver_name)
-        self.solver = SOLVERS[solver_name](self.time_limit_ms)
+        self.solver = SOLVERS[solver_name](self.time_limit_ms / 1000)
 
     # These are common to all models, so we can implement them here
     def _init_variables(self, *args, **kwargs):
@@ -157,7 +157,7 @@ class SPulpModelRotation(ABC):
 
         return {
             'board_width': self.board_width,
-            'board_height': self.board_height.varValue,
+            'board_height': self.board_height.roundedValue(),
             'n_circuits': self.n_circuits,
             'widths': widths,
             'heights': heights,
