@@ -80,8 +80,12 @@ class SMTModel:
         return SMTModel(**instance, time_limit_ms=time_limit_ms, allow_rotation=allow_rotation)
 
     def _get_smt_lib_options(self) -> str:
-        return "(set-option :produce-models true)\n(set-logic QF_LIA)\n". \
-            format(self.time_limit_ms)
+        if self.allow_rotation:
+            return "(set-option :produce-models true)\n(set-logic QF_NIA)\n". \
+                format(self.time_limit_ms)
+        else:
+            return "(set-option :produce-models true)\n(set-logic QF_LIA)\n". \
+                format(self.time_limit_ms)
 
     def set_time_limit(self, time_limit_ms: int):
         self.time_limit_ms = time_limit_ms

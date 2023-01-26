@@ -53,13 +53,13 @@ class SPulpModel(ABC):
     def set_time_limit(self, time_limit_ms: int) -> None:
         self.time_limit_ms = time_limit_ms
         print("Time limit set to {}".format(time_limit_ms))
-        self.solver = SOLVERS[self.solver_name](self.time_limit_ms)
+        self.solver = SOLVERS[self.solver_name](self.time_limit_ms / 1000)
 
     def set_solver(self, solver_name: str):
         if solver_name not in SOLVERS:
             raise ValueError("Solver %s not supported." % solver_name)
         self.solver_name = solver_name
-        self.solver = SOLVERS[solver_name](self.time_limit_ms)
+        self.solver = SOLVERS[solver_name](self.time_limit_ms / 1000)
 
     # These are common to all models, so we can implement them here
     def _init_variables(self):
@@ -162,7 +162,7 @@ class SPulpModel(ABC):
 
         return {
             'board_width': self.board_width,
-            'board_height': self.board_height.varValue,
+            'board_height': self.board_height.roundedValue(),
             'n_circuits': self.n_circuits,
             'widths': self.widths,
             'heights': self.heights,

@@ -89,9 +89,10 @@ def run(model_name: str, instances_input_dir: str, solutions_output_dir: str, st
                                                        add_implied_constraints=True,
                                                        presolve=presolve_for_milp, time_limit_ms=timeout_ms,
                                                        allow_rotation=allow_rotation_smt)
-            instance.set_time_limit(timeout_ms)
             if solver_for_milp is not None:
                 instance.set_solver(solver_for_milp)
+
+            instance.set_time_limit(timeout_ms)
             solution, elapsed_ms, optimal_solution = \
                 instance.solve(linear_search=perform_linear_search, solver=solver_for_smt,
                                turn_on_cumulative_constraints=enable_cumulative_constraints_smt,

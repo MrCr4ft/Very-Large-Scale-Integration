@@ -255,7 +255,6 @@ class SATStripPackingModelRotation:
         ys = []
         actual_heights = []
         actual_widths = []
-        rotated = []
 
         for i in range(self.n_circuits):
             xs.append(self.x_vars[i].actual_value(model))
@@ -267,8 +266,6 @@ class SATStripPackingModelRotation:
                 actual_widths.append(self.widths[i])
                 actual_heights.append(self.heights[i])
 
-            rotated.append(is_true(model[self.rotated[i]]))
-
         return {
             'board_width': self.board_width,
             'board_height': self.board_height_actual_value,
@@ -277,7 +274,6 @@ class SATStripPackingModelRotation:
             'heights': actual_heights,
             'x': xs,
             'y': ys,
-            'rotated': rotated
         }
 
     def solve(self, linear_search: bool = True, *args, **kwargs) -> typing.Tuple[typing.Dict[str, typing.Any], int, bool]:
