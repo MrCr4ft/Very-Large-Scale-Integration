@@ -35,7 +35,21 @@ array[CIRCUIT] of var bool: rotated;
 array[CIRCUIT] of var int: R_W;
 array[CIRCUIT] of var int: R_H;
 
+array[CIRCUIT] of var bool: aux_lex_1;  % These are needed for the ROR decomposition of the lex_lesseq constraint
+array[CIRCUIT] of var bool: aux_lex_2;
+
 %%% ----------------------------------------------------------- %%% 
+
+
+
+
+%%% ------------------------ PREDICATES -------------------------- %%% 
+
+predicate lex_lesseq_ror(par int: N, array[int] of var bool: X, array[int] of var int: A, array[int] of var int: B) =
+    X[1] /\ (X[N] <-> (A[N] <= B[N])) /\ forall(i in 1..N-1) (X[N - i] <-> ((A[N - i] <= B[N - i]) \/ (A[N - i] == B[N - i] /\ X[N - i + 1])));
+
+%%% ----------------------------------------------------------- %%% 
+
 
 
 
@@ -51,17 +65,6 @@ constraint diffn(x, y, R_W, R_H);
 constraint cumulative(y, R_H, R_W, L);
 constraint cumulative(x, R_W, R_H, FINAL_H);
 
-% This redundant constraint imposes that each rectangle must occur (both in the horizontal and vertical position) either
-% at the beginning of a row (column) or immediately next to another rectangle.
-/*
-constraint (
-  forall(i in CIRCUIT) (
-    member([0] ++ [x[j] + R_W[j] | j in CIRCUIT where j != i], x[i]) 
-    /\
-    member([0] ++ [y[j] + R_H[j] | j in CIRCUIT where j != i], y[i]))
-);
-*/
-
 constraint (forall(i in CIRCUIT) (
   forall(j in CIRCUIT where j > i) (
     if R_W[i] + R_W[j] > L then (y[i] + R_H[i] <= y[j] \/ y[i] >= y[j] + R_H[j]) endif)));
@@ -72,7 +75,7 @@ constraint (forall(i in CIRCUIT) (
     
 % Symmetry breaking constraint that imposes an ordering between the two biggest rectangle.
 % The biggest rectangle is placed on the bottom-left area of the board wrt the second biggest one.
-/*constraint
+constraint
   let {
     int: o1 = decreasing_area_order[1],
     int: o2 = decreasing_area_order[2]
@@ -82,19 +85,14 @@ constraint (forall(i in CIRCUIT) (
     [y[o1],x[o1]],
     [y[o2],x[o2]]
 );
-*/
-
-% Symmetry breaking and domain reduction constraint: places the biggest rectangle in the lower half of the board
-
-constraint (x[decreasing_area_order[1]] <= (L - R_W[decreasing_area_order[1]]) div 2);
-constraint (y[decreasing_area_order[1]] <= (FINAL_H - R_H[decreasing_area_order[1]]) div 2);
-
 
 % Symmetry breaking constraint: square circuits can be fixed as rotated
 constraint forall(i in CIRCUIT where W[i] = H[i]) (rotated[i]);
 
-%constraint lex_lesseq(x, [L - x[i] - R_W[i] | i in CIRCUIT]);
-%constraint lex_lesseq(y, [L - y[i] - R_H[i] | i in CIRCUIT]);
+% Symmetry breaking constraint. Impose lexicographic ordering to circuit position and reflected one.
+% Even though this constraint prunes much the solution space, it slows down the search, probably because it is quite heavy.
+constraint lex_lesseq_ror(N, aux_lex_1, x, [L - x[i] - W[i] | i in CIRCUIT]);
+constraint lex_lesseq_ror(N, aux_lex_2, y, [L - y[i] - H[i] | i in CIRCUIT]);
     
 %%% ----------------------------------------------------------- %%% 
 

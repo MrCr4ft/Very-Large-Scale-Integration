@@ -53,6 +53,16 @@ constraint diffn(x, y, R_W, R_H);
 constraint cumulative(y, R_H, R_W, L);
 constraint cumulative(x, R_W, R_H, FINAL_H);
 
+
+constraint (forall(i in CIRCUIT) (
+  forall(j in CIRCUIT where j > i) (
+    if W[i] + W[j] > L then (y[i] + H[i] <= y[j] \/ y[i] >= y[j] + H[j]) endif)));
+
+constraint (forall(i in CIRCUIT) (
+  forall(j in CIRCUIT where j > i) (
+    if H[i] + H[j] > FINAL_H then (x[i] + W[i] <= x[j] \/ x[i] >= x[j] + W[j]) endif)));
+    
+
 % Channeling constraint
 constraint forall(i in 0..L - 1, j in 0..H_UB, k in CIRCUIT) (
   board[j,i] == k
@@ -62,15 +72,6 @@ constraint forall(i in 0..L - 1, j in 0..H_UB, k in CIRCUIT) (
     /\
     y[k] <= j /\ j < y[k] + R_H[k]
   )
-);
-
-% This redundant constraint imposes that each rectangle must occur (both in the horizontal and vertical position) either
-% at the beginning of a row (column) or immediately next to another rectangle.
-constraint (
-  forall(i in CIRCUIT) (
-    member([0] ++ [x[j] + R_W[j] | j in CIRCUIT where j != i], x[i])
-    /\
-    member([0] ++ [y[j] + R_H[j] | j in CIRCUIT where j != i], y[i]))
 );
 
 % Symmetry breaking constraint that imposes an ordering between rectangles of the same size.
