@@ -127,11 +127,7 @@ class SATStripPackingModelRotation:
         # 5. Rotation constraints
         basic_constraints += self._rotation_constraints()
 
-        # 6. Exclusive placing relationship implied constraints
-        if self.add_implied_constraints:
-            basic_constraints += self._exclusive_constraints()
-
-        # 7. Same sized circuits symmetry breaking
+        # 6 Fix rotation state of square circuits
         if self.activate_symmetry_breaking:
             basic_constraints += self._square_circuits_fixed_rotated_state()
 
@@ -199,15 +195,6 @@ class SATStripPackingModelRotation:
                         )
                     )
                 )
-
-        return constraints
-
-    def _exclusive_constraints(self) -> typing.List[BoolRef]:
-        constraints = list()
-        for i in range(self.n_circuits):
-            for j in range(i + 1, self.n_circuits):
-                constraints.append(Or(Not(self.lr[i][j]), Not(self.lr[j][i])))
-                constraints.append(Or(Not(self.ud[i][j]), Not(self.ud[j][i])))
 
         return constraints
 
@@ -338,7 +325,6 @@ class SATStripPackingModelRotation:
                     ub = mid - 1
                 elif evaluation == unknown:
                     print("Reached timeout. Terminating...")
-                    model = None
                     break
                 elif evaluation == unsat:
                     print("Unsatisfiable with board height equal to {}".format(mid))

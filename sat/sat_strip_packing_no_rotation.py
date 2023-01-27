@@ -12,7 +12,7 @@ from .order_encoding import OrderEncodedVariable
 class SATStripPackingModelNoRotation:
     def __init__(self, n_circuits: int, board_width: int, widths: typing.List[int], heights: typing.List[int],
                  height_lower_bound: int, height_upper_bound: int, activate_symmetry_breaking: bool = False,
-                 add_implied_constraints: bool = False, use_paper_non_overlapping_constraints: bool = False):
+                 add_implied_constraints: bool = False):
         self.y_vars = None
         self.x_vars = None
         self.board_height_actual_value = None
@@ -25,30 +25,25 @@ class SATStripPackingModelNoRotation:
         self.height_upper_bound = height_upper_bound
         self.activate_symmetry_breaking = activate_symmetry_breaking
         self.add_implied_constraints = add_implied_constraints
-        self.use_paper_non_overlapping_constraints = use_paper_non_overlapping_constraints
         self.time_limit_ms = 300000
         print("Time limit set to: {}".format(self.time_limit_ms))
 
     @staticmethod
     def from_instance_json(json_filepath: str, activate_symmetry_breaking: bool = False,
                            add_implied_constraints: bool = False,
-                           use_paper_non_overlapping_constraints: bool = False,
                            *args, **kwargs) -> "SATStripPackingModelNoRotation":
         with open(json_filepath, "r") as f:
             instance = json.load(f)
 
         return SATStripPackingModelNoRotation(**instance, activate_symmetry_breaking=activate_symmetry_breaking,
-                                              add_implied_constraints=add_implied_constraints,
-                                              use_paper_non_overlapping_constraints=use_paper_non_overlapping_constraints)
+                                              add_implied_constraints=add_implied_constraints)
 
     @staticmethod
     def from_dict(instance_dict: dict, activate_symmetry_breaking: bool = False,
                   add_implied_constraints: bool = False,
-                  use_paper_non_overlapping_constraints: bool = False,
                   *args, **kwargs) -> "SATStripPackingModelNoRotation":
         return SATStripPackingModelNoRotation(**instance_dict, activate_symmetry_breaking=activate_symmetry_breaking,
-                                              add_implied_constraints=add_implied_constraints,
-                                              use_paper_non_overlapping_constraints=use_paper_non_overlapping_constraints)
+                                              add_implied_constraints=add_implied_constraints)
 
     def set_time_limit(self, time_limit: int) -> None:
         self.time_limit_ms = time_limit
@@ -84,16 +79,9 @@ class SATStripPackingModelNoRotation:
         basic_constraints += self._board_height_constraints()
 
         # 4. No overlap
-        if self.use_paper_non_overlapping_constraints:
-            basic_constraints += self._non_overlapping_constraints_paper()  # faster generation
-        else:
-            basic_constraints += self._non_overlapping_constraints_linear_inequality_enconding()
+        basic_constraints += self._non_overlapping_constraints_linear_inequality_enconding()
 
-        # 5. Exclusive placing relationship implied constraints
-        if self.add_implied_constraints:
-            basic_constraints += self._exclusive_constraints()
-
-        # 6. Same sized circuits symmetry breaking
+        # 5. Same sized circuits symmetry breaking
         if self.activate_symmetry_breaking:
             basic_constraints += self._same_sized_circuits_symmetry_breaking_constraints()
 
@@ -179,15 +167,6 @@ class SATStripPackingModelNoRotation:
                         self.y_vars[i].order_encoding_booleans[o - self.heights[i] + 1]
                     )
                 )
-
-        return constraints
-
-    def _exclusive_constraints(self) -> typing.List[BoolRef]:
-        constraints = list()
-        for i in range(self.n_circuits):
-            for j in range(i + 1, self.n_circuits):
-                constraints.append(Or(Not(self.lr[i][j]), Not(self.lr[j][i])))
-                constraints.append(Or(Not(self.ud[i][j]), Not(self.ud[j][i])))
 
         return constraints
 
@@ -317,7 +296,6 @@ class SATStripPackingModelNoRotation:
                     ub = mid - 1
                 elif evaluation == unknown:
                     print("Reached timeout. Terminating...")
-                    model = None
                     break
                 elif evaluation == unsat:
                     print("Unsatisfiable with board height equal to {}".format(mid))
