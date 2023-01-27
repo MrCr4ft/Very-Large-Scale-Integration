@@ -29,8 +29,8 @@ mkdir -p $SOLUTIONS_DIR
 #Best model with rotation without symmetry breaking (DONE)
 #python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/best_model_rotation_no_sb.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_best_model_rotation_no_sb/chuffed/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_best_model_rotation_no_sb/chuffed/stats.csv" --solver="chuffed" --timeout-ms=$TIME_LIMIT --draw-solutions=True
 
-#Board channeling without rotation (TODO)
-python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/board_channeling.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_board_channeling/chuffed/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_board_channeling/chuffed/stats.csv" --solver="chuffed" --timeout-ms=$TIME_LIMIT --draw-solutions=False
+#Board channeling without rotation (DONE)
+#python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/board_channeling.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_board_channeling/chuffed/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_board_channeling/chuffed/stats.csv" --solver="chuffed" --timeout-ms=$TIME_LIMIT --draw-solutions=False
 #Board channeling with rotation (TODO)
 python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" --model-filepath="./cp/board_channeling_rotation.mzn" --solutions-output-dir="$SOLUTIONS_DIR/cp_board_channeling_rotation/chuffed/" --stats-output-csv-file="$SOLUTIONS_DIR/cp_board_channeling_rotation/chuffed/stats.csv" --solver="chuffed" --timeout-ms=$TIME_LIMIT --draw-solutions=False
 
@@ -55,10 +55,15 @@ python ./solve_instances_minizinc.py --instances-input-dir="$INSTANCES_DIR/dzn" 
 
 #SAT
 
-#SATNoRotation
-python ./solve_instances_sat_milp_smt.py --instances-input-dir="$INSTANCES_DIR/json" --solutions-output-dir="$SOLUTIONS_DIR/sat_no_rotation" --stats-output-csv-file="$SOLUTIONS_DIR/sat_no_rotation/stats.csv" --timeout-ms=$TIME_LIMIT --model-name=SATNoRotation --activate-symmetry-breaking=True --draw-solutions=False
-#SATRotation
-python ./solve_instances_sat_milp_smt.py --instances-input-dir="$INSTANCES_DIR/json" --solutions-output-dir="$SOLUTIONS_DIR/sat_with_rotation" --stats-output-csv-file="$SOLUTIONS_DIR/sat_with_rotation/stats.csv" --timeout-ms=$TIME_LIMIT --model-name=SATRotation --activate-symmetry-breaking=True --draw-solutions=False
+#SATNoRotation With Symmetry Breaking
+python ./solve_instances_sat_milp_smt.py --instances-input-dir="$INSTANCES_DIR/json" --solutions-output-dir="$SOLUTIONS_DIR/sat_no_rotation_sb" --stats-output-csv-file="$SOLUTIONS_DIR/sat_no_rotation_sb/stats.csv" --timeout-ms=$TIME_LIMIT --model-name=SATNoRotation --activate-symmetry-breaking=True --draw-solutions=False
+#SATRotation With Symmetry Breaking
+python ./solve_instances_sat_milp_smt.py --instances-input-dir="$INSTANCES_DIR/json" --solutions-output-dir="$SOLUTIONS_DIR/sat_with_rotation_sb" --stats-output-csv-file="$SOLUTIONS_DIR/sat_with_rotation_sb/stats.csv" --timeout-ms=$TIME_LIMIT --model-name=SATRotation --activate-symmetry-breaking=True --draw-solutions=False
+
+#SATNoRotation Without Symmetry Breaking
+python ./solve_instances_sat_milp_smt.py --instances-input-dir="$INSTANCES_DIR/json" --solutions-output-dir="$SOLUTIONS_DIR/sat_no_rotation" --stats-output-csv-file="$SOLUTIONS_DIR/sat_no_rotation/stats.csv" --timeout-ms=$TIME_LIMIT --model-name=SATNoRotation --activate-symmetry-breaking=False --draw-solutions=False
+#SATRotation Without Symmetry Breaking
+python ./solve_instances_sat_milp_smt.py --instances-input-dir="$INSTANCES_DIR/json" --solutions-output-dir="$SOLUTIONS_DIR/sat_with_rotation" --stats-output-csv-file="$SOLUTIONS_DIR/sat_with_rotation/stats.csv" --timeout-ms=$TIME_LIMIT --model-name=SATRotation --activate-symmetry-breaking=False --draw-solutions=False
 
 
 
