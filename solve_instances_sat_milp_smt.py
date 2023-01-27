@@ -14,9 +14,8 @@ import numpy as np
 from sat.sat_strip_packing_no_rotation import SATStripPackingModelNoRotation
 from sat.sat_strip_packing_rotation import SATStripPackingModelRotation
 from milp.positioning_and_covering_models import PCMILPProblemNoRotation, PCMILPProblemRotation
-from milp.dgp_big_m_models import SGBMPulpModel, S1BMPulpModel, S2BMPulpModel
-from milp.dgp_big_m_models_with_rotation import SGBMPulpModelRotation, S1BMPulpModelRotation, \
-    S2BMPulpModelRotation
+from milp.dgp_big_m_models import SGBMPulpModel
+from milp.dgp_big_m_models_with_rotation import SGBMPulpModelRotation
 from smt.model import SMTModel
 from utils.misc import is_a_valid_solution, draw_board, solution_to_txt
 
@@ -27,11 +26,7 @@ MODELS = {
     "PCMILPNoRotation": PCMILPProblemNoRotation,
     "PCMILPRotation": PCMILPProblemRotation,
     "SGBM": SGBMPulpModel,
-    "S1BM": S1BMPulpModel,
-    "S2BM": S2BMPulpModel,
     "SGBMRotation": SGBMPulpModelRotation,
-    "S1BMRotation": S1BMPulpModelRotation,
-    "S2BMRotation": S2BMPulpModelRotation,
     "SMT": SMTModel,
 }
 CSV_FIELD_NAMES = ["instance", "optimally_solved", "board_height", "elapsed_ms"]
