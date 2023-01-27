@@ -32,7 +32,22 @@ array[CIRCUIT] of var 0..H_UB: y;               % Y coordinates of the circuits
 
 array[0..H_UB,0..L - 1] of var 1..N + 1: board; % This matrix will represent the board cells, it is needed to break additional symmetries
 
-%%% ----------------------------------------------------------- %%%
+%%% ----------------------------------------------------------- %%% 
+
+
+
+%%% ------------------------ PREDICATES -------------------------- %%% 
+
+
+predicate lex_lesseq_ror(array[int] of var int: A, array[int] of var int: B) =
+    let {
+      par int: N = length(A),
+      array[1..N] of var bool: X;
+    } in
+    X[1] /\ (X[N] <-> (A[N] <= B[N])) /\ forall(i in 1..N-1) (X[N - i] <-> ((A[N - i] <= B[N - i]) \/ (A[N - i] == B[N - i] /\ X[N - i + 1])));
+
+
+%%% ----------------------------------------------------------- %%% 
 
 
 
@@ -82,27 +97,27 @@ constraint forall(i in CIRCUIT) (
     endif
 );
 
-% Symmetry breaking constraint that imposes an ordering between the two biggest rectangle.
-% The biggest rectangle is placed on the bottom-left area of the board wrt the second biggest one.
+
 constraint
   let {
     int: o1 = decreasing_area_order[1],
     int: o2 = decreasing_area_order[2]
   }
   in
-  lex_less(
-    [y[o1],x[o1]],
-    [y[o2],x[o2]]
-);
+  lex_less([y[o1],x[o1]], [y[o2],x[o2]]);
+
 
 % Symmetry is broken by imposing a lexicographic ordering on the flattened version of the board, with respect to its reflection upon axis and the diagonal
 constraint symmetry_breaking_constraint(
-  lex_lesseq(array1d(board), [ board[i,j] | i in 0..H_UB, j in reverse(0..L-1)])
+  lex_lesseq_ror(array1d(board), [ board[i,j] | i in 0..H_UB, j in reverse(0..L-1)])
   /\
-  lex_lesseq(array1d(board),[ board[i,j] | i in reverse(0..H_UB), j in 0..L-1])
+  lex_lesseq_ror(array1d(board),[ board[i,j] | i in reverse(0..H_UB), j in 0..L-1])
   /\
-  lex_lesseq(array1d(board), [ board[i,j] | i in reverse(0..H_UB), j in reverse(0..L-1)])
+  lex_lesseq_ror(array1d(board), [ board[i,j] | i in reverse(0..H_UB), j in reverse(0..L-1)])
 );
+
+constraint lex_lesseq_ror(x, [L - x[i] - W[i] | i in CIRCUIT]);
+constraint lex_lesseq_ror(y, [L - y[i] - H[i] | i in CIRCUIT]);
 
 %%% ----------------------------------------------------------- %%%
 
