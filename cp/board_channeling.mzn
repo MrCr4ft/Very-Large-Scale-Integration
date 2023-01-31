@@ -117,24 +117,22 @@ constraint symmetry_breaking_constraint(
 );
 
 constraint lex_lesseq_ror(x, [L - x[i] - W[i] | i in CIRCUIT]);
-constraint lex_lesseq_ror(y, [L - y[i] - H[i] | i in CIRCUIT]);
+constraint lex_lesseq_ror(y, [FINAL_H - y[i] - H[i] | i in CIRCUIT]);
 
 %%% ----------------------------------------------------------- %%%
 
 
 %%% ------------------------- SEARCH -------------------------- %%%
 
+%Can help with gecode
 /*
-solve ::
-	int_search([FINAL_H], input_order, indomain_min, complete)
-		:: seq_search([
-			int_search([x[i] | i in decreasing_area_order], input_order, indomain_min),
-			int_search([y[i] | i in decreasing_area_order], input_order, indomain_min),
-		])
-	  :: restart_luby(100)
-minimize FINAL_H;
+solve :: seq_search([
+  int_search(x, dom_w_deg, indomain_split),
+  int_search(y, dom_w_deg, indomain_split)]) :: restart_luby(100) minimize FINAL_H;
+
 */
 
+% can help with chuffed
 solve :: restart_luby(100) minimize FINAL_H;
 
 
