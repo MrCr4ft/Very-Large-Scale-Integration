@@ -214,7 +214,9 @@ class SATStripPackingModelNoRotation:
         return constraints
 
     def _one_pair_symmetry_breaking_constraints(self) -> typing.List[BoolRef]:
-        return [Not(self.lr[0][1]), Not(self.lr[1][0])]
+        areas = [self.widths[i] * self.heights[i] for i in range(self.n_circuits)]
+        sorted_indexes = np.argsort(areas)
+        return [Not(self.lr[sorted_indexes[0]][sorted_indexes[1]]), Not(self.lr[sorted_indexes[1]][sorted_indexes[0]])]
 
     def _set_board_height_actual_value(self, board_height: int) -> None:
         self.board_height_actual_value = board_height
