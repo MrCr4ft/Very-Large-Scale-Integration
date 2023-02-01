@@ -104,7 +104,7 @@ class SPulpModel(ABC):
                     self.z_2[i * self.n_circuits + j].setInitialValue(0)
                     self.z_2[j * self.n_circuits + i].setInitialValue(1)
 
-        print("Warm start enabled.")
+        print("Warm start solution loaded.")
 
     @abstractmethod
     def _add_model_specific_constraints(self, *args, **kwargs):
@@ -138,7 +138,7 @@ class SPulpModel(ABC):
     def _build_model(self):
         self._init_variables()
         self._define_objective()
-        #self._large_circuits_constraints()
+        self._large_circuits_constraints()
         self._add_model_specific_constraints()
         if self.activate_symmetry_breaking:
             self._add_symmetry_breaking_constraint()
@@ -189,6 +189,7 @@ class SPulpModel(ABC):
             print("Model solved optimally")
         elif time_limit_exceeded or self.model.status == 0:
             print("Time limit exceeded")
+            return self._retrieve_solution(), elapsed_time, False
         elif self.model.status == -1:
             print("Model unsatisfiable")
         else:

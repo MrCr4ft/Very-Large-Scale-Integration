@@ -107,6 +107,14 @@ class SATStripPackingModelRotation:
 
         return constraints
 
+    def _exclusive_constraints(self) -> typing.List[BoolRef]:
+        constraints = []
+        for i in range(self.n_circuits):
+            for j in range(i + 1, self.n_circuits):
+                constraints.append(Not(And(self.lr[i][j], self.lr[j][i])))
+                constraints.append(Not(And(self.ud[i][j], self.ud[j][i])))
+        return constraints
+
     def _basic_constraints(self) -> typing.List[BoolRef]:
         basic_constraints = list()
 
@@ -127,7 +135,11 @@ class SATStripPackingModelRotation:
         # 5. Rotation constraints
         basic_constraints += self._rotation_constraints()
 
-        # 6 Fix rotation state of square circuits
+        # 6. Exclusive constraints
+        if self.add_implied_constraints:
+            basic_constraints += self._exclusive_constraints()
+
+        # 7 Fix rotation state of square circuits
         if self.activate_symmetry_breaking:
             basic_constraints += self._square_circuits_fixed_rotated_state()
 
@@ -231,7 +243,10 @@ class SATStripPackingModelRotation:
         return constraints
 
     def _one_pair_symmetry_breaking_constraints(self) -> typing.List[BoolRef]:
-        return [Not(self.lr[0][1]), Not(self.lr[1][0])]
+        areas = [self.widths[i] * self.heights[i] for i in range(self.n_circuits)]
+        sorted_indexes = np.argsort(areas)
+        return [Not(self.lr[sorted_indexes[0]][sorted_indexes[1]]), Not(self.lr[sorted_indexes[1]][sorted_indexes[0]])]
+
 
     def _set_board_height_actual_value(self, board_height: int) -> None:
         self.board_height_actual_value = board_height
@@ -294,7 +309,7 @@ class SATStripPackingModelRotation:
                     lb = ub + 1
                 elif evaluation == unknown:
                     print("Reached timeout. Terminating...")
-                    model = None
+                    s.pop()
                     break
                 elif evaluation == unsat:
                     print("Unsatisfiable with board height equal to {}".format(lb))
@@ -325,6 +340,7 @@ class SATStripPackingModelRotation:
                     ub = mid - 1
                 elif evaluation == unknown:
                     print("Reached timeout. Terminating...")
+                    s.pop()
                     break
                 elif evaluation == unsat:
                     print("Unsatisfiable with board height equal to {}".format(mid))
@@ -335,7 +351,7 @@ class SATStripPackingModelRotation:
 
         end_time = perf_counter()
         elapsed_time = np.ceil((end_time - start_time) * 1000)
-        print("Total time elapsed (in seconds): {}".format(elapsed_time))
+        print("Total time elapsed (in milliseconds): {}".format(elapsed_time))
 
         time_limit_exceeded = elapsed_time >= self.time_limit_ms
 

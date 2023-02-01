@@ -81,7 +81,11 @@ class SATStripPackingModelNoRotation:
         # 4. No overlap
         basic_constraints += self._non_overlapping_constraints_linear_inequality_enconding()
 
-        # 5. Same sized circuits symmetry breaking
+        # 5. Exclusive constraints
+        if self.add_implied_constraints:
+            basic_constraints += self._exclusive_constraints()
+
+        # 6. Same sized circuits symmetry breaking
         if self.activate_symmetry_breaking:
             basic_constraints += self._same_sized_circuits_symmetry_breaking_constraints()
 
@@ -239,7 +243,15 @@ class SATStripPackingModelNoRotation:
             'y': ys
         }
 
-    def solve(self, linear_search: bool = True, *args, **kwargs) \
+    def _exclusive_constraints(self) -> typing.List[BoolRef]:
+        constraints = []
+        for i in range(self.n_circuits):
+            for j in range(i + 1, self.n_circuits):
+                constraints.append(Not(And(self.lr[i][j], self.lr[j][i])))
+                constraints.append(Not(And(self.ud[i][j], self.ud[j][i])))
+        return constraints
+
+    def solve(self, linear_search: bool = False, *args, **kwargs) \
             -> typing.Tuple[typing.Dict[str, typing.Any], int, bool]:
         self._init_z3_variables()
         s = Solver()
@@ -269,7 +281,7 @@ class SATStripPackingModelNoRotation:
                     lb = ub + 1
                 elif evaluation == unknown:
                     print("Reached timeout. Terminating...")
-                    model = None
+                    s.pop()
                     break
                 elif evaluation == unsat:
                     print("Unsatisfiable with board height equal to {}".format(lb))
@@ -298,6 +310,7 @@ class SATStripPackingModelNoRotation:
                     ub = mid - 1
                 elif evaluation == unknown:
                     print("Reached timeout. Terminating...")
+                    s.pop()
                     break
                 elif evaluation == unsat:
                     print("Unsatisfiable with board height equal to {}".format(mid))

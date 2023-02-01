@@ -122,7 +122,7 @@ class SPulpModelRotation(ABC):
                     self.z_2[j * self.n_circuits + i].setInitialValue(1)
             self.rotated[i].setInitialValue(0)
 
-        print("Warm start enabled.")
+        print("Warm start solution loaded.")
 
     def _rotation_constraints(self):
         # Rotation constraints
@@ -200,6 +200,7 @@ class SPulpModelRotation(ABC):
             print("Model solved optimally")
         elif time_limit_exceeded or self.model.status == 0:
             print("Time limit exceeded")
+            return self._retrieve_solution(), elapsed_time, False
         elif self.model.status == -1:
             print("Model unsatisfiable")
         else:
