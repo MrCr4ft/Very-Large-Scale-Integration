@@ -122,7 +122,7 @@ class SPulpModelRotation(ABC):
                     self.z_2[j * self.n_circuits + i].setInitialValue(1)
             self.rotated[i].setInitialValue(0)
 
-        print("Warm start enabled.")
+        print("Warm start solution loaded.")
 
     def _rotation_constraints(self):
         # Rotation constraints
@@ -200,6 +200,7 @@ class SPulpModelRotation(ABC):
             print("Model solved optimally")
         elif time_limit_exceeded or self.model.status == 0:
             print("Time limit exceeded")
+            return self._retrieve_solution(), elapsed_time, False
         elif self.model.status == -1:
             print("Model unsatisfiable")
         else:
@@ -254,6 +255,108 @@ class SGBMPulpModelRotation(SPulpModelRotation):
                 self.model += self.y[j] >= \
                               self.y[i] + self.actual_heights[i] - (
                                           1 - self.z_2[j * self.n_circuits + i]) * self.height_upper_bound
+                # logic proposition only one
+                self.model += self.z_1[i * self.n_circuits + j] + self.z_1[j * self.n_circuits + i] + \
+                              self.z_2[i * self.n_circuits + j] + self.z_2[j * self.n_circuits + i] == 1
+
+class S1BMPulpModelRotation(SPulpModelRotation):
+    def __init__(self, n_circuits: int, board_width: int, widths: typing.List[int], heights: typing.List[int],
+                 height_lower_bound: int, height_upper_bound: int, use_warm_start: bool = True,
+                 activate_symmetry_breaking: bool = True):
+        super().__init__(n_circuits, board_width, widths, heights, height_lower_bound, height_upper_bound,
+                         use_warm_start, activate_symmetry_breaking)
+
+    @staticmethod
+    def from_instance_json(json_filepath: str, use_warm_start: bool = True, activate_symmetry_breaking: bool = True,
+                           *args, **kwargs) -> "S1BMPulpModelRotation":
+        with open(json_filepath, 'r') as f:
+            instance_dict = json.load(f)
+
+        return S1BMPulpModelRotation(**instance_dict, use_warm_start=use_warm_start,
+                                     activate_symmetry_breaking=activate_symmetry_breaking)
+
+    @staticmethod
+    def from_dict(instance_dict: dict, use_warm_start: bool = True) \
+            -> "S1BMPulpModelRotation":
+        return S1BMPulpModelRotation(**instance_dict, use_warm_start=use_warm_start)
+
+    def _add_model_specific_constraints(self):
+        # Enforce board height to be the maximum y coordinate of any circuit, considering the circuit height
+        for i in range(self.n_circuits):
+            self.model += self.y[i] + self.heights[i] <= self.board_height
+
+        # Add constraint that circuits do not overlap
+        for i in range(self.n_circuits):
+            for j in range(i + 1, self.n_circuits):
+                self.model += self.x[i] + self.actual_widths[i] <= \
+                              self.x[j] + (1 - self.z_1[i * self.n_circuits + j]) * self.board_width
+                self.model += self.x[j] + self.actual_widths[j] <= \
+                              self.x[i] + (1 - self.z_1[j * self.n_circuits + i]) * self.board_width
+                self.model += self.y[i] >= \
+                              self.y[j] + self.actual_heights[j] - (
+                                          1 - self.z_2[i * self.n_circuits + j]) * self.height_upper_bound
+                self.model += self.x[i] + self.actual_widths[i] >= \
+                              self.x[j] - (1 - self.z_2[i * self.n_circuits + j]) * self.board_width
+                self.model += self.x[j] + self.actual_widths[j] >= \
+                              self.x[i] - (1 - self.z_2[i * self.n_circuits + j]) * self.board_width
+                self.model += self.y[j] >= \
+                              self.y[i] + self.actual_heights[i] - (
+                                          1 - self.z_2[j * self.n_circuits + i]) * self.height_upper_bound
+                self.model += self.x[i] + self.actual_widths[i] >= \
+                              self.x[j] - (1 - self.z_2[j * self.n_circuits + i]) * self.board_width
+                self.model += self.x[j] + self.actual_widths[j] >= \
+                              self.x[i] - (1 - self.z_2[j * self.n_circuits + i]) * self.board_width
+                # logic proposition only one
+                self.model += self.z_1[i * self.n_circuits + j] + self.z_1[j * self.n_circuits + i] + \
+                              self.z_2[i * self.n_circuits + j] + self.z_2[j * self.n_circuits + i] == 1
+
+
+class S2BMPulpModelRotation(SPulpModelRotation):
+    def __init__(self, n_circuits: int, board_width: int, widths: typing.List[int], heights: typing.List[int],
+                 height_lower_bound: int, height_upper_bound: int, use_warm_start: bool = True,
+                 activate_symmetry_breaking: bool = True):
+        super().__init__(n_circuits, board_width, widths, heights, height_lower_bound, height_upper_bound,
+                         use_warm_start, activate_symmetry_breaking)
+
+    @staticmethod
+    def from_instance_json(json_filepath: str, use_warm_start: bool = True, activate_symmetry_breaking: bool = True,
+                           *args, **kwargs) -> "S2BMPulpModelRotation":
+        with open(json_filepath, 'r') as f:
+            instance_dict = json.load(f)
+
+        return S2BMPulpModelRotation(**instance_dict, use_warm_start=use_warm_start,
+                                     activate_symmetry_breaking=activate_symmetry_breaking)
+
+    @staticmethod
+    def from_dict(instance_dict: dict, use_warm_start: bool = True) -> "S2BMPulpModelRotation":
+        return S2BMPulpModelRotation(**instance_dict, use_warm_start=use_warm_start)
+
+    def _add_model_specific_constraints(self):
+        # Enforce board height to be the maximum y coordinate of any circuit, considering the circuit height
+        for i in range(self.n_circuits):
+            self.model += self.y[i] + self.heights[i] <= self.board_height
+
+        # Add constraint that circuits do not overlap
+        for i in range(self.n_circuits):
+            for j in range(i + 1, self.n_circuits):
+                self.model += self.x[i] + self.actual_widths[i] <= \
+                              self.x[j] + (1 - self.z_1[i * self.n_circuits + j]) * self.board_width
+                self.model += self.x[j] + self.actual_widths[j] <= \
+                              self.x[i] + (1 - self.z_1[j * self.n_circuits + i]) * self.board_width
+                self.model += self.y[i] >= \
+                              self.y[j] + self.actual_heights[j] - (
+                                          1 - self.z_2[i * self.n_circuits + j]) * self.height_upper_bound
+                self.model += self.x[i] + self.actual_widths[i] >= \
+                              self.x[j] + 1 - (1 - self.z_2[i * self.n_circuits + j]) * self.board_width
+                self.model += self.x[j] + self.actual_widths[j] >= \
+                              self.x[i] + 1 - (1 - self.z_2[i * self.n_circuits + j]) * self.board_width
+                self.model += self.y[j] >= \
+                              self.y[i] + self.actual_heights[i] - (
+                                          1 - self.z_2[j * self.n_circuits + i]) * self.height_upper_bound
+                self.model += self.x[i] + self.actual_widths[i] >= \
+                              self.x[j] + 1 - (1 - self.z_2[j * self.n_circuits + i]) * self.board_width
+                self.model += self.x[j] + self.actual_widths[j] >= \
+                              self.x[i] + 1 - (1 - self.z_2[j * self.n_circuits + i]) * self.board_width
                 # logic proposition only one
                 self.model += self.z_1[i * self.n_circuits + j] + self.z_1[j * self.n_circuits + i] + \
                               self.z_2[i * self.n_circuits + j] + self.z_2[j * self.n_circuits + i] == 1

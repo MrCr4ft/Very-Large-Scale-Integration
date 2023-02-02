@@ -245,6 +245,13 @@ class SMTModel:
         return lexicographic_ordering_ror("aux_lex_sb_", ["y{}".format(o1), "x{}".format(o1)],
                                           ["y{}".format(o2), "x{}".format(o2)])
 
+    def _rotation_symmetry_breaking(self):
+        constraints = ""
+        for i in range(self.n_circuits):
+            if self.widths[i] == self.heights[i]:
+                constraints += "(assert r{})\n".format(i)
+        return constraints
+
     def to_smt_lib_format(self, turn_on_cumulative_constraints: bool = False,
                           turn_on_symmetry_breaking: bool = True) -> str:
         smt_lib_instance = self._get_smt_lib_options() + "\n" + self._declare_smt_lib_variables() + "\n" + \
@@ -269,6 +276,8 @@ class SMTModel:
         if turn_on_symmetry_breaking:
             smt_lib_instance += self.lexicographic_ordering_symmetry_breaking()
             smt_lib_instance += self.one_pair_of_circuits_symmetry_breaking()
+            if self.allow_rotation:
+                smt_lib_instance += self._rotation_symmetry_breaking()
 
         return smt_lib_instance
 
