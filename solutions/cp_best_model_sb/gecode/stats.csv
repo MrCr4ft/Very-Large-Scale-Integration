@@ -1,6 +1,6 @@
 instance,optimally_solved,board_height,elapsed_ms
 ins-24,False,32,300000
-ins-40,False,32,300000
+ins-40,False,,300000
 ins-1,True,8,0.982
 ins-10,True,17,3.597
 ins-11,False,19,300000
@@ -25,12 +25,12 @@ ins-29,False,50,300000
 ins-3,True,10,0.174
 ins-30,False,39,300000
 ins-31,True,38,17462.399999999998
-ins-32,False,38,300000
+ins-32,False,,300000
 ins-33,True,40,68.19200000000001
 ins-34,False,44,300000
-ins-35,False,44,300000
+ins-35,False,,300000
 ins-36,False,49,300000
-ins-37,False,49,300000
+ins-37,False,,300000
 ins-38,False,72,300000
 ins-39,False,74,300000
 ins-4,True,11,0.9039999999999999
