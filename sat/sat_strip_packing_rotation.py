@@ -270,7 +270,7 @@ class SATStripPackingModelRotation:
 
         return {
             'board_width': self.board_width,
-            'board_height': self.board_height_actual_value,
+            'board_height': self.board_height.actual_value(model),
             'n_circuits': self.n_circuits,
             'widths': actual_widths,
             'heights': actual_heights,
@@ -309,7 +309,6 @@ class SATStripPackingModelRotation:
                     lb = ub + 1
                 elif evaluation == unknown:
                     print("Reached timeout. Terminating...")
-                    s.pop()
                     break
                 elif evaluation == unsat:
                     print("Unsatisfiable with board height equal to {}".format(lb))
@@ -340,7 +339,6 @@ class SATStripPackingModelRotation:
                     ub = mid - 1
                 elif evaluation == unknown:
                     print("Reached timeout. Terminating...")
-                    s.pop()
                     break
                 elif evaluation == unsat:
                     print("Unsatisfiable with board height equal to {}".format(mid))
